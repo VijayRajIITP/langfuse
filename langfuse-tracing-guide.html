@@ -223,6 +223,53 @@
     border-top: 1px solid var(--rule); font-size: 13.5px; color: var(--ink-soft);
   }
 
+  /* ---------- ui mockups ---------- */
+  .ui {
+    border: 1px solid var(--rule-strong); border-radius: var(--radius);
+    background: var(--surface); overflow: hidden; margin: 14px 0 6px;
+  }
+  .ui-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 9px 13px; border-bottom: 1px solid var(--rule); background: var(--code-bg);
+  }
+  .ui-title { font-weight: 600; font-size: 13.5px; }
+  .ui-body { padding: 12px 13px; }
+  .ui-body + .ui-body { border-top: 1px solid var(--rule); }
+  .ui-cap { font-size: 12px; color: var(--ink-faint); margin: 0 0 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip {
+    border: 1px solid var(--rule-strong); border-radius: 999px;
+    padding: 1px 9px; font-size: 11.5px; color: var(--ink-soft); background: var(--paper);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+  .chip.accent { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .chip.plain { font-family: inherit; }
+  dl.kv {
+    display: grid; grid-template-columns: max-content minmax(0, 1fr);
+    gap: 5px 18px; margin: 0;
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px;
+  }
+  dl.kv dt { color: var(--ink-faint); }
+  dl.kv dd { margin: 0; color: var(--ink); word-break: break-word; }
+  .metrics { display: flex; flex-wrap: wrap; gap: 22px; }
+  .metric b { display: block; font-size: 14.5px; font-weight: 600; }
+  .metric span { font-size: 11.5px; color: var(--ink-faint); }
+  ul.ui-list { list-style: none; margin: 0; padding: 0; font-size: 12.8px; }
+  ul.ui-list li {
+    display: flex; gap: 10px; align-items: center;
+    padding: 8px 13px; border-bottom: 1px solid var(--rule);
+  }
+  ul.ui-list li:last-child { border-bottom: 0; }
+  ul.ui-list .grow { flex: 1; min-width: 0; }
+  .otype {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: .04em; padding: 1px 6px;
+    border-radius: 3px; border: 1px solid var(--rule-strong); color: var(--ink-faint);
+  }
+  .otype.gen { color: var(--accent); border-color: var(--accent); }
+  .muted { color: var(--ink-faint); }
+  .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; color: var(--ink-soft); }
+
   @media (max-width: 900px) {
     .shell { grid-template-columns: 1fr; gap: 0; padding: 0 18px 72px; }
     nav.toc { position: static; max-height: none; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
@@ -259,7 +306,21 @@
       <li class="sub"><a href="#examples">LangChain</a></li>
       <li class="sub"><a href="#examples">LangGraph</a></li>
       <li class="sub"><a href="#examples">DeepAgents</a></li>
-      <li><a href="#attributes">Naming and grouping traces</a></li>
+      <li><a href="#instrument">5. Choosing how to instrument</a></li>
+      <li class="sub"><a href="#observe">The decorator</a></li>
+      <li class="sub"><a href="#context-manager">The context manager</a></li>
+      <li class="sub"><a href="#manual">Manual observations</a></li>
+      <li class="sub"><a href="#streaming-trap">Streaming trap</a></li>
+      <li><a href="#attributes">6. Useful attributes</a></li>
+      <li class="sub"><a href="#approaches">Four ways to set them</a></li>
+      <li class="sub"><a href="#meta">Metadata</a></li>
+      <li class="sub"><a href="#cost">Model, tokens, cost</a></li>
+      <li class="sub"><a href="#tags">Tags</a></li>
+      <li class="sub"><a href="#users">User IDs</a></li>
+      <li class="sub"><a href="#sessions">Session IDs</a></li>
+      <li class="sub"><a href="#env">Environment</a></li>
+      <li class="sub"><a href="#prompts">Linking prompts</a></li>
+      <li class="sub"><a href="#grouping">Grouping traces</a></li>
       <li><a href="#flush">Flushing before exit</a></li>
       <li><a href="#troubleshooting">Troubleshooting</a></li>
       <li><a href="#reference">Reference</a></li>
@@ -267,6 +328,7 @@
   </nav>
 
   <main>
+
 
     <!-- PART 1: DOCKER -->
     <section id="run">
@@ -374,7 +436,8 @@ docker compose down -v   # stop and delete the volumes — all data goes with th
       <p class="part-note">Identical for LangChain, LangGraph and DeepAgents. Everything after this section is framework-specific.</p>
 
       <div class="note">
-        <p><strong>This guide uses Python SDK v3.</strong> On v2 the import was <code class="inline">from langfuse.callback import CallbackHandler</code> and clients were instantiated directly. v3 uses <code class="inline">from langfuse.langchain import CallbackHandler</code> with a singleton reached through <code class="inline">get_client()</code>.</p>
+        <p><strong>This guide targets Python SDK v4</strong>, which introduced an observations-first data model: user, session, tags and metadata propagate to every observation rather than living only on the trace. Check yours with <code class="inline">pip show langfuse</code>.</p>
+        <p>Two things moved in v4 that older examples still show: <code class="inline">update_current_trace()</code> became <code class="inline">propagate_attributes()</code>, and <code class="inline">CallbackHandler(update_trace=...)</code> was removed. Anything importing <code class="inline">langfuse.callback</code> is v2, two majors back — current is <code class="inline">langfuse.langchain</code>.</p>
       </div>
 
       <ol class="steps">
@@ -514,7 +577,7 @@ print(answer)</code></pre>
 └─ SPAN        StrOutputParser</code></pre>
         </div>
         <div class="note">
-          <p>Each <code class="inline">invoke</code> creates its own trace. To group several calls into one, wrap them in <code class="inline">langfuse.start_as_current_observation(...)</code> — see <a href="#attributes">naming and grouping</a>.</p>
+          <p>Each <code class="inline">invoke</code> creates its own trace. To group several calls into one, wrap them in <code class="inline">langfuse.start_as_current_observation(...)</code> — see <a href="#grouping">grouping traces</a>.</p>
         </div>
       </div>
 
@@ -570,7 +633,7 @@ graph.invoke({"messages": [{"role": "user", "content": "What is Langfuse?"}]})</
    └─ GENERATION  ChatAnthropic     tokens · latency · cost</code></pre>
         </div>
         <div class="note">
-          <p>Every invocation is a separate trace, even when the graph keeps state across turns. Pass the LangGraph <code class="inline">thread_id</code> as <code class="inline">langfuse_session_id</code> so a conversation reads as one session in the UI — see <a href="#attributes">naming and grouping</a>.</p>
+          <p>Every invocation is a separate trace, even when the graph keeps state across turns. Pass the LangGraph <code class="inline">thread_id</code> as <code class="inline">langfuse_session_id</code> so a conversation reads as one session in the UI — see <a href="#sessions">session IDs</a>.</p>
         </div>
       </div>
 
@@ -651,31 +714,460 @@ agent = create_deep_agent(
       </div>
     </section>
 
+    <!-- PART 5: INSTRUMENTATION -->
+    <section id="instrument">
+      <h2 class="part">5. Choosing how to instrument</h2>
+      <p class="part-note">The callback handler covers everything LangChain runs and nothing else. The moment your own code matters — a vector search, an HTTP fetch, a guardrail, a parser — you pick one of three tools. They are interoperable and nest automatically, so mixing them in one trace is normal.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Tool</th><th>Reach for it when</th><th>What it cannot do</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Callback handler</b><br><code>CallbackHandler()</code></td>
+              <td>Anything LangChain, LangGraph or DeepAgents executes</td>
+              <td>See your own functions, or any call that is not a LangChain runnable</td>
+            </tr>
+            <tr>
+              <td><b>Decorator</b><br><code>@observe()</code></td>
+              <td>A function of yours that should be one span</td>
+              <td>Trace part of a function, or work that spans two functions</td>
+            </tr>
+            <tr>
+              <td><b>Context manager</b><br><code>start_as_current_observation()</code></td>
+              <td>A block inside a function, or a parent that owns the whole turn</td>
+              <td>Cover code that is not in one contiguous block</td>
+            </tr>
+            <tr>
+              <td><b>Manual</b><br><code>start_observation()</code></td>
+              <td>Work whose start and end are far apart</td>
+              <td>Become the active parent — nothing nests under it automatically</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <p><strong>Quick decision.</strong> Is it a LangChain runnable? Nothing to do. A whole function of yours? <code class="inline">@observe</code>. Part of a function, or you need the trace id or the outcome? <code class="inline">with</code>. Start and end in different places? Manual.</p>
+      </div>
+
+      <h3 id="observe">The decorator — one function, one span</h3>
+      <p><code class="inline">@observe()</code> wraps a function and records its arguments, return value, duration and any exception. Nesting follows your call hierarchy with no extra work, and because it reads the active context, a decorated function called from inside a traced node lands in the right place automatically.</p>
+
+      <p><strong>Use it for</strong> retrieval, reranking, document parsing, a call to another service — the steps that explain a bad answer. <strong>Skip it for</strong> anything LangChain already traces, and for bookkeeping like audit writes or cache puts, which only add noise.</p>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from langfuse import observe
+
+@observe(name="qdrant-search")
+async def retrieve(query: str, top_k: int = 10):
+    return await qdrant.search(query, limit=top_k)
+
+@observe(name="rerank", capture_input=False)
+def rerank(chunks, query):
+    # capture_input=False because `chunks` is large. Set what you want instead.
+    langfuse.update_current_span(input={"query": query, "n": len(chunks)})
+    return reranker.rank(chunks, query)</code></pre>
+      </div>
+
+      <div class="note warn">
+        <p><strong>It captures arguments by default.</strong> A function that takes your whole context object or a list of retrieved chunks will dump all of it into Langfuse on every call. Use <code class="inline">capture_input=False</code> (and <code class="inline">capture_output=False</code>) and set the fields you want, or disable it globally with <code class="inline">LANGFUSE_OBSERVE_DECORATOR_IO_CAPTURE_ENABLED</code>.</p>
+      </div>
+
+      <h3 id="context-manager">The context manager — a parent that owns the turn</h3>
+      <p><code class="inline">start_as_current_observation()</code> creates a span and makes it the active parent, so everything created inside it — decorated functions, LangChain runs, nested blocks — becomes its child.</p>
+
+      <p>You do not need one for a single <code class="inline">invoke</code> where you only want user, session and tags. You do need one when any of these is true:</p>
+
+      <ul class="plain">
+        <li><strong>Several steps must form one trace.</strong> Retrieval, then the graph, then a summariser. Without a parent they are three separate traces and the cost of one user turn is split across three rows.</li>
+        <li><strong>The outcome is only known at the end.</strong> Metadata is set before the call; success, cancellation and failure are known after. A caught exception without this looks like a successful run.</li>
+        <li><strong>You need the trace id during the run.</strong> <code class="inline">get_current_trace_id()</code> returns a value only inside an active observation. No id means no thumbs-up score later.</li>
+        <li><strong>Trace input and output should be yours.</strong> They mirror the root observation by default, and LLM-as-a-judge evaluators read them.</li>
+      </ul>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">with langfuse.start_as_current_observation(
+    as_type="span",
+    name="chat-turn",
+    input={"question": question},          # becomes the trace input
+) as root:
+
+    trace_id = langfuse.get_current_trace_id()   # send this to your frontend
+
+    try:
+        chunks = await retrieve(question)         # @observe span
+        answer = await graph.ainvoke(             # handler spans
+            state, config={"callbacks": [langfuse_handler]}
+        )
+        root.update(output={"answer": answer})    # becomes the trace output
+
+    except RequestCancelled:
+        root.update(level="WARNING", status_message="cancelled by user")
+        raise
+    except Exception as exc:
+        root.update(level="ERROR", status_message=str(exc))
+        raise</code></pre>
+      </div>
+
+      <div class="ui tree">
+        <div class="ui-bar"><span class="block-lang">resulting trace</span></div>
+        <pre><code>TRACE  chat-turn                         input and output set explicitly
+├─ SPAN        retrieve                  @observe
+├─ SPAN        rerank                    @observe
+└─ SPAN        LangGraph                 callback handler
+   ├─ SPAN        preprocess
+   └─ SPAN        deep_agent
+      └─ GENERATION  ChatOpenAI</code></pre>
+      </div>
+      <p class="ui-cap">One trace, three instrumentation styles, no manual wiring between them.</p>
+
+      <h3 id="manual">Manual observations — the exception</h3>
+      <p>Use <code class="inline">start_observation()</code> when a span's start and end are not in the same block: a background task kicked off by a request, or work finished by a later event. You call <code class="inline">.end()</code> yourself; forget it and the span never appears.</p>
+
+      <div class="note warn">
+        <p><strong>It does not shift the active context.</strong> A manual span is a child of whatever was active when you created it, but nothing created afterwards nests <em>under</em> it — those still attach to the original parent. So it is the wrong tool for wrapping a graph or a stream. To give it children, call <code class="inline">start_as_current_observation()</code> on the span object itself.</p>
+      </div>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">with langfuse.start_as_current_observation(as_type="span", name="chat-turn"):
+    audit = langfuse.start_observation(name="audit-log")
+    audit.update(input={"question": question})
+
+    answer = agent.invoke(state, config={"callbacks": [langfuse_handler]})
+
+    audit.update(output={"written": True})
+    audit.end()          # required — the `with` form does this for you</code></pre>
+      </div>
+
+      <h3 id="streaming-trap">One trap with streaming endpoints</h3>
+      <p>If your endpoint returns a <code class="inline">StreamingResponse</code>, the handler returns before the generator runs. A span opened around the return closes immediately and its children orphan.</p>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python"># Wrong — the span closes before any work happens
+with langfuse.start_as_current_observation(as_type="span", name="chat-turn"):
+    return StreamingResponse(event_stream())
+
+# Right — open it inside the generator
+async def event_stream():
+    with langfuse.start_as_current_observation(as_type="span", name="chat-turn") as root:
+        async for chunk in graph.astream(state, config=run_config):
+            yield ...
+        root.update(output={"answer": final_answer})</code></pre>
+      </div>
+      <p>Verify nesting under concurrent load rather than assuming it: OpenTelemetry context across a suspended async generator is a known sharp edge. If you do not need non-LangChain work in the trace, skip the parent span and let the config do the work.</p>
+    </section>
+
     <!-- ATTRIBUTES -->
     <section id="attributes">
-      <h2 class="part">Naming and grouping traces</h2>
-      <p class="part-note">Out of the box, traces are named after the runnable — a list of entries called <code class="inline">LangGraph</code> is hard to search. These options work the same for all three frameworks.</p>
+      <h2 class="part">6. Useful attributes</h2>
+      <p class="part-note">Out of the box you get a tree of spans named after your runnables. That is enough to debug one run, but not enough to answer "which users cost the most" or "why did retrieval fail for that request". These attributes are what turn traces into something you can filter, cost-attribute, and build dashboards on. All of them work identically for LangChain, LangGraph and DeepAgents.</p>
 
-      <h3>Set attributes per invocation</h3>
-      <p>The simplest approach: reserved <code class="inline">langfuse_</code> keys in the config metadata. Use the conversation or thread id as the session id to group multi-turn runs.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Attribute</th><th>Set it with</th><th>What it unlocks</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Metadata</td><td>any key in <code>config["metadata"]</code></td><td>Filtering by arbitrary context; input for evaluators</td></tr>
+            <tr><td>Model, tokens, cost</td><td>captured automatically</td><td>Cost breakdowns by model, user, feature</td></tr>
+            <tr><td>Tags</td><td><code>langfuse_tags</code></td><td>Metric breakdowns by business dimension</td></tr>
+            <tr><td>User ID</td><td><code>langfuse_user_id</code></td><td>Per-user cost and quality views</td></tr>
+            <tr><td>Session ID</td><td><code>langfuse_session_id</code></td><td>Session replay across multiple traces</td></tr>
+            <tr><td>Environment</td><td><code>LANGFUSE_TRACING_ENVIRONMENT</code></td><td>Keeps dev traces out of production dashboards</td></tr>
+            <tr><td>Prompt link</td><td><code>langfuse_prompt</code> on the template</td><td>Metrics per prompt version</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="all-at-once">All of them at once</h3>
+      <p>Everything except the environment and the prompt link can be set through the invocation config. Start here — <a href="#approaches">three other approaches</a> follow, for cases where the values are not available at the call site.</p>
       <div class="block">
         <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
         <pre><code data-lang="python">result = agent.invoke(
     {"messages": [{"role": "user", "content": "What is Langfuse?"}]},
     config={
         "callbacks": [langfuse_handler],
-        "run_name": "research-run",
+        "run_name": "research-run",              # trace name in the UI
         "metadata": {
-            "langfuse_user_id": "user-5678",
-            "langfuse_session_id": "session-1234",
-            "langfuse_tags": ["research", "local"],
+            "langfuse_user_id": "user-5678",     # reserved keys
+            "langfuse_session_id": "thread-1234",
+            "langfuse_tags": ["research", "web-app"],
+            "app_version": "2.4.1",              # anything else is plain metadata
+            "feature": "report-builder",
         },
     },
 )</code></pre>
       </div>
 
-      <h3>Group several calls into one trace</h3>
-      <p>Wrap the calls in a Langfuse observation. Anything the handler records inside that scope nests under it, including non-LangChain work of your own.</p>
+      <div class="ui">
+        <div class="ui-bar">
+          <span class="ui-title">research-run</span>
+          <span class="chip accent">research</span>
+          <span class="chip accent">web-app</span>
+        </div>
+        <div class="ui-body">
+          <dl class="kv">
+            <dt>user</dt><dd>user-5678</dd>
+            <dt>session</dt><dd>thread-1234</dd>
+            <dt>environment</dt><dd>development</dd>
+          </dl>
+        </div>
+        <div class="ui-body">
+          <div class="metrics">
+            <span class="metric"><b>12.4 s</b><span>latency</span></span>
+            <span class="metric"><b>18,204</b><span>tokens</span></span>
+            <span class="metric"><b>$0.0731</b><span>cost</span></span>
+            <span class="metric"><b>9</b><span>observations</span></span>
+          </div>
+        </div>
+      </div>
+      <p class="ui-cap">Trace header, roughly. Illustration rather than a screenshot.</p>
+
+      <h3 id="approaches">Four ways to set them</h3>
+      <p>The reserved metadata keys above are the simplest route, but not the only one. Which fits depends on whether the values are known at build time, at call time, or somewhere deeper in your own code.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Approach</th><th>Use when</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>1.</b> Metadata in the invoke config</td>
+              <td>The values are known at the call site. Simplest, and what most examples show.</td>
+            </tr>
+            <tr>
+              <td><b>2.</b> Bound once with <code>.with_config()</code></td>
+              <td>The values are fixed for the lifetime of the chain — app version, feature name, a static tag set.</td>
+            </tr>
+            <tr>
+              <td><b>3.</b> <code>propagate_attributes()</code> around the call</td>
+              <td>Several invocations share the same user or session, or you want the attributes on every nested observation.</td>
+            </tr>
+            <tr>
+              <td><b>4.</b> <code>@observe</code> plus <code>propagate_attributes()</code></td>
+              <td>The values are only known partway through your own function, after the call has started.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4 class="mini">2 — bind them to the chain</h4>
+      <p>Stops you repeating the same config at every call site. Anything set here applies to every invocation of that runnable.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">traced_agent = agent.with_config({
+    "callbacks": [langfuse_handler],
+    "metadata": {"langfuse_tags": ["research"], "app_version": "2.4.1"},
+})
+
+traced_agent.invoke({"messages": [{"role": "user", "content": "What is Langfuse?"}]})</code></pre>
+      </div>
+
+      <h4 class="mini">3 — propagate around the call</h4>
+      <p>The v3 way to set attributes on everything inside a scope, including observations your own code creates alongside the LangChain ones.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from langfuse import get_client, propagate_attributes
+
+langfuse = get_client()
+
+with langfuse.start_as_current_observation(as_type="span", name="chat-turn"):
+    with propagate_attributes(
+        user_id="user-5678",
+        session_id="thread-1234",
+        tags=["research"],
+        metadata={"app_version": "2.4.1"},
+    ):
+        agent.invoke(
+            {"messages": [{"role": "user", "content": "What is Langfuse?"}]},
+            config={"callbacks": [langfuse_handler]},
+        )</code></pre>
+      </div>
+
+      <h4 class="mini">4 — set them after the fact</h4>
+      <p>For values you only learn mid-request — the user id after auth resolves, a tenant after routing, a classification the first model call produced.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from langfuse import observe, propagate_attributes
+
+@observe()
+def handle_request(payload):
+    user = authenticate(payload)          # only known now
+
+    with propagate_attributes(
+        user_id=user.id,
+        session_id=payload["thread_id"],
+        tags=["research"],
+    ):
+        return agent.invoke(
+            {"messages": payload["messages"]},
+            config={"callbacks": [langfuse_handler]},
+        )</code></pre>
+      </div>
+      <p>On v3 this was <code class="inline">langfuse.update_current_trace(...)</code>, called imperatively rather than as a block. If you genuinely cannot use a <code class="inline">with</code> — a framework pre-hook, for instance — <code class="inline">langfuse.update_current_span()</code> still sets attributes on the active observation.</p>
+
+      <div class="note warn">
+        <p><strong>If attributes land on a child span instead of the trace.</strong> With some agent setups the metadata attaches to a nested observation rather than the parent trace, so the trace list shows nothing. Use approach 3: an enclosing span plus <code class="inline">propagate_attributes</code>, called early enough to cover every observation. The old <code class="inline">CallbackHandler(update_trace=True)</code> fix was removed in v4.</p>
+      </div>
+
+      <h3 id="meta">Metadata for context</h3>
+      <p>Metadata is a free-form key-value store on the observation. It is the right home for anything that is useful context but does not belong in the name or the input and output. In practice that means:</p>
+      <ul class="plain">
+        <li><strong>Evaluation context</strong> — ground truth or expected behaviour that an LLM-as-a-judge evaluator needs but that is not part of the actual input. Evaluators can reference metadata fields in their variable mapping.</li>
+        <li><strong>Request context</strong> — internal request IDs, the API route or app version that handled the call, active feature flags or experiment variants. This is what lets you correlate a trace with your other systems.</li>
+        <li><strong>Retrieval context</strong> — for RAG steps, the data source, the index queried, how many chunks came back. Invaluable when a retrieval step returns junk.</li>
+        <li><strong>Raw payloads</strong> — full request or response objects that would clutter the input and output fields but are occasionally needed.</li>
+        <li><strong>Annotation context</strong> — extra information that helps a human reviewer judge the run fairly.</li>
+      </ul>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">config={
+    "callbacks": [langfuse_handler],
+    "metadata": {
+        "request_id": "req_8f21c",
+        "app_version": "2.4.1",
+        "experiment_variant": "rerank_v2",
+        "retrieval_source": "confluence",
+        "retrieval_chunks": 8,
+    },
+}</code></pre>
+      </div>
+      <div class="ui">
+        <div class="ui-bar"><span class="ui-title">Metadata</span></div>
+        <div class="ui-body">
+          <dl class="kv">
+            <dt>request_id</dt><dd>req_8f21c</dd>
+            <dt>app_version</dt><dd>2.4.1</dd>
+            <dt>experiment_variant</dt><dd>rerank_v2</dd>
+            <dt>retrieval_source</dt><dd>confluence</dd>
+            <dt>retrieval_chunks</dt><dd>8</dd>
+          </dl>
+        </div>
+      </div>
+      <p class="ui-cap">Metadata panel on the observation. These keys are filterable in the trace list, so <code class="inline">experiment_variant = rerank_v2</code> becomes a saved view.</p>
+
+      <div class="note">
+        <p>To attach the same metadata to every observation under a call rather than just the one you configured, wrap it in <code class="inline">propagate_attributes(metadata={...})</code> — see <a href="#grouping">grouping</a> below.</p>
+      </div>
+
+      <h3 id="cost">Model, tokens and cost</h3>
+      <p>Cost attribution needs three things on each generation observation: the <strong>model name</strong>, which Langfuse looks up in its pricing table; <strong>usage details</strong>, meaning input, output and optionally cached tokens; and <strong>cost details</strong>, only if you want to override the automatic pricing because you have a custom agreement.</p>
+      <p>All three integrations capture this for you — the LangChain callback reads it off the model response. There is nothing to write.</p>
+      <div class="ui">
+        <div class="ui-bar">
+          <span class="otype gen">GENERATION</span>
+          <span class="ui-title">ChatAnthropic</span>
+          <span class="chip">claude-sonnet-4-5</span>
+        </div>
+        <div class="ui-body">
+          <div class="metrics">
+            <span class="metric"><b>1,842</b><span>input tokens</span></span>
+            <span class="metric"><b>1,024</b><span>cached</span></span>
+            <span class="metric"><b>318</b><span>output tokens</span></span>
+            <span class="metric"><b>$0.0071</b><span>cost</span></span>
+            <span class="metric"><b>2.1 s</b><span>latency</span></span>
+          </div>
+        </div>
+      </div>
+      <p class="ui-cap">Generation observation. If cost shows as empty, the model name did not match Langfuse's pricing table — add a model definition under project settings and it backfills for new traces.</p>
+
+      <h3 id="tags">Tags for business dimensions</h3>
+      <p>Tags drive filtering and metric breakdowns along dimensions your business cares about: how latency differs between web and API users, how cost splits across features. They are <strong>immutable and set at creation time</strong>, which makes them ideal for things you know upfront and useless for things you learn later.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">"metadata": {"langfuse_tags": ["channel:web", "feature:report-builder"]}</code></pre>
+      </div>
+      <div class="note">
+        <p>If you need to label a trace based on something determined <em>after</em> the run — an LLM-as-a-judge verdict, a human review outcome — use <strong>scores</strong> instead. Tags cannot be edited once the trace is written.</p>
+      </div>
+
+      <h3 id="users">User IDs</h3>
+      <p>Setting a user ID connects traces to people and unlocks the per-user views: which users cost the most, how output quality varies between them, what one user's usage actually looks like over a week.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">"metadata": {"langfuse_user_id": "user-5678"}</code></pre>
+      </div>
+      <div class="note warn">
+        <p>Use a stable internal identifier, not an email address or a name. The user ID is displayed throughout the UI and exported with the trace.</p>
+      </div>
+
+      <h3 id="sessions">Session IDs</h3>
+      <p>When several traces logically belong to one interaction, group them into a session and you get a replay view of the whole thing in sequence. This is worth doing when you are building a chatbot, where each user message is its own trace but the conversation is one thing; when several agents each contribute to a final output; or when a workflow spans multiple requests with human steps in between. A single-request, single-response app does not need sessions.</p>
+      <p>In LangGraph and DeepAgents the natural session id is the <code class="inline">thread_id</code> you are already passing.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">thread_id = "thread-1234"
+
+result = graph.invoke(
+    {"messages": [{"role": "user", "content": "and what about pricing?"}]},
+    config={
+        "callbacks": [langfuse_handler],
+        "configurable": {"thread_id": thread_id},   # LangGraph state
+        "metadata": {"langfuse_session_id": thread_id},  # Langfuse grouping
+    },
+)</code></pre>
+      </div>
+      <div class="ui">
+        <div class="ui-bar"><span class="ui-title">Session</span><span class="chip">thread-1234</span><span class="muted">3 traces</span></div>
+        <ul class="ui-list">
+          <li><span class="otype">TRACE</span><span class="grow">What is Langfuse?</span><span class="num">4.2 s</span><span class="num">$0.019</span></li>
+          <li><span class="otype">TRACE</span><span class="grow">and what about pricing?</span><span class="num">3.1 s</span><span class="num">$0.014</span></li>
+          <li><span class="otype">TRACE</span><span class="grow">summarise that for my team</span><span class="num">5.1 s</span><span class="num">$0.040</span></li>
+        </ul>
+      </div>
+      <p class="ui-cap">Session replay. Each turn stays a separate trace; the session is the thread through them.</p>
+
+      <h3 id="env">Environment</h3>
+      <p>Set the environment so your local experiments do not pollute production dashboards and evaluations. It is a first-class field rather than metadata, and the simplest place to set it is the environment itself.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">bash</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="bash">export LANGFUSE_TRACING_ENVIRONMENT="development"   # or staging, production</code></pre>
+      </div>
+      <p>If one shared process serves several environments, set it per request instead:</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from langfuse import propagate_attributes
+
+with propagate_attributes(environment="staging"):
+    chain.invoke({"topic": "observability"}, config={"callbacks": [langfuse_handler]})</code></pre>
+      </div>
+
+      <h3 id="prompts">Linking prompts</h3>
+      <p>If you manage prompts in Langfuse, link them to your generations and you can see which prompt version produced a given trace, then compare metrics across versions as you iterate.</p>
+      <p>The link goes on the <strong>prompt template</strong>, not on the invocation config — a common source of confusion, since every other attribute here goes the other way.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from langchain_core.prompts import ChatPromptTemplate
+
+langfuse_prompt = langfuse.get_prompt("research-instructions")
+
+prompt = ChatPromptTemplate.from_template(
+    langfuse_prompt.get_langchain_prompt(),
+    metadata={"langfuse_prompt": langfuse_prompt},   # the link
+)
+
+chain = prompt | llm
+chain.invoke({"topic": "observability"}, config={"callbacks": [langfuse_handler]})</code></pre>
+      </div>
+      <div class="ui">
+        <div class="ui-bar">
+          <span class="otype gen">GENERATION</span>
+          <span class="ui-title">ChatAnthropic</span>
+          <span class="chip accent">research-instructions v4</span>
+        </div>
+      </div>
+      <p class="ui-cap">The prompt chip on a generation links back to that version in prompt management.</p>
+
+      <h3 id="grouping">Grouping several calls into one trace</h3>
+      <p>Each <code class="inline">invoke</code> creates its own trace. To make a multi-step pipeline read as a single trace, wrap the calls in a Langfuse observation — anything the handler records inside that scope nests under it, including non-LangChain work of your own.</p>
       <div class="block">
         <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
         <pre><code data-lang="python">from langfuse import get_client, propagate_attributes
@@ -685,7 +1177,11 @@ langfuse = get_client()
 with langfuse.start_as_current_observation(as_type="span", name="research-pipeline") as root:
     root.update(input={"query": "What is Langfuse?"})
 
-    with propagate_attributes(session_id="session-1234", user_id="user-5678"):
+    with propagate_attributes(
+        session_id="thread-1234",
+        user_id="user-5678",
+        metadata={"app_version": "2.4.1"},
+    ):
         draft = chain.invoke({"topic": "observability"}, config={"callbacks": [langfuse_handler]})
         review = agent.invoke(
             {"messages": [{"role": "user", "content": draft}]},
@@ -693,6 +1189,10 @@ with langfuse.start_as_current_observation(as_type="span", name="research-pipeli
         )
 
     root.update(output={"final": review["messages"][-1].content})</code></pre>
+      </div>
+      <div class="note">
+        <p>Attributes set through <code class="inline">propagate_attributes</code> apply to every observation created inside the block, so you set them once rather than on each invocation.</p>
+        <p><strong>Call it early.</strong> Only observations created inside the block carry the attributes, and Langfuse computes attribute-level metrics from those. Propagated values must be strings of 200 characters or fewer, and propagated metadata keys must be alphanumeric — invalid values are dropped with a warning. Bulk context belongs in observation metadata through the invocation config, not here.</p>
       </div>
     </section>
 
@@ -733,7 +1233,7 @@ get_client().shutdown()   # flush and stop the background worker, at process exi
 
       <div class="fix">
         <h3>Traces appear but are shallow</h3>
-        <p>If a nested chain or sub-graph is missing, it was probably invoked outside the traced runnable — for example, inside a plain Python helper called by a tool. Wrap that section in a Langfuse observation, as shown in <a href="#attributes">grouping</a>.</p>
+        <p>If a nested chain or sub-graph is missing, it was probably invoked outside the traced runnable — for example, inside a plain Python helper called by a tool. Wrap that section in a Langfuse observation, as shown under <a href="#grouping">grouping traces</a>.</p>
       </div>
 
       <div class="fix">
@@ -749,6 +1249,10 @@ get_client().shutdown()   # flush and stop the background worker, at process exi
         <li><a href="https://langfuse.com/integrations/frameworks/langchain">LangChain and LangGraph tracing docs</a></li>
         <li><a href="https://langfuse.com/integrations/frameworks/langgraph">LangGraph cookbook, including multi-agent traces</a></li>
         <li><a href="https://langfuse.com/integrations/frameworks/langchain-deepagents">DeepAgents integration docs</a></li>
+        <li><a href="https://langfuse.com/docs/observability/sdk/instrumentation">Instrumentation: decorator, context manager, manual</a></li>
+        <li><a href="https://langfuse.com/docs/observability/sdk/upgrade-path/python-v3-to-v4">Python v3 to v4 migration</a></li>
+        <li><a href="https://langfuse.com/docs/observability/features/metadata">Metadata</a>, <a href="https://langfuse.com/docs/observability/features/sessions">sessions</a>, and <a href="https://langfuse.com/docs/observability/sdk/instrumentation">trace attributes</a></li>
+        <li><a href="https://langfuse.com/docs/prompt-management/features/link-to-traces">Linking prompts to traces</a></li>
         <li><a href="https://github.com/langchain-ai/deepagents">LangChain DeepAgents on GitHub</a></li>
       </ul>
     </section>
@@ -863,5 +1367,6 @@ get_client().shutdown()   # flush and stop the background worker, at process exi
   }
 })();
 </script>
+
 </body>
 </html>
