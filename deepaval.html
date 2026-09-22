@@ -460,11 +460,20 @@ def test_answer_relevancy():
       <p>Answer Relevancy + Faithfulness + Contextual Relevancy are all referenceless — no <code class="inline">expected_output</code> needed. High scores across all three is a solid signal the pipeline's hyperparameters are dialed in, without any labeled data. Add Contextual Precision and Recall on top only when labeled outputs are available, for stricter retrieval checks.</p>
 
       <h3>Building the golden dataset</h3>
-      <p>A golden is a lightweight template — just an <code class="inline">input</code> and an <code class="inline">expected_output</code> — not a full test case yet. Two ways to get one:</p>
-      <ul class="plain">
-        <li><strong>By hand</strong>: a plain JSON list, one entry per question — <code class="inline">{"id": "G01", "input": "...", "expected_output": "..."}</code>. This is what the tuning example below loops over.</li>
-        <li><strong>Generated</strong>: <code class="inline">Synthesizer.generate_goldens_from_docs(document_paths=[...])</code> creates goldens straight from your own knowledge-base files when you don't have one yet.</li>
-      </ul>
+      <p>A golden is a lightweight template — just an <code class="inline">input</code> and an <code class="inline">expected_output</code>, not a full test case yet (no <code class="inline">retrieval_context</code> or <code class="inline">actual_output</code>; those get filled in live, at evaluation time, by actually calling the retriever and generator). Four ways to build the set, roughly in order of how much they scale:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>How it works</th><th>Scalable?</th></tr></thead>
+          <tbody>
+            <tr><td>Human-written</td><td>Someone writes each <code>input</code> + <code>expected_output</code> by hand</td><td>No — fine for a first handful of cases, too slow to sustain</td></tr>
+            <tr><td>LLM-assisted (chat UI) + human review</td><td>Give a general LLM chat tool — ChatGPT, Claude — instructions/criteria to draft candidate goldens, then a person reviews and edits before use</td><td>Somewhat — faster than by hand, but still manual glue: copy, paste, format, review</td></tr>
+            <tr><td>DeepEval Synthesizer</td><td>The inbuilt module that automates the same idea programmatically — <code>generate_goldens_from_docs()</code> generates goldens straight from your knowledge base, in code, at scale</td><td>Yes — the automated version of the row above</td></tr>
+            <tr><td>From production</td><td>Once the app is deployed, mine real user interactions from logs; thumbs-up/thumbs-down feedback decides what becomes a golden</td><td>Yes, and the set keeps growing on its own</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="block">
         <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
         <pre><code data-lang="python">from deepeval.synthesizer import Synthesizer
@@ -476,7 +485,8 @@ goldens = synthesizer.generate_goldens_from_docs(
 )
 dataset = EvaluationDataset(goldens=goldens)</code></pre>
       </div>
-      <p>Either way, a golden stores neither <code class="inline">retrieval_context</code> nor <code class="inline">actual_output</code> — those get filled in live, at evaluation time, by actually calling your retriever (and generator).</p>
+
+      <p>On production feedback: a 👎 on a real response flags a genuine failure mode worth turning into a regression golden — the exact case that broke, kept so it never quietly breaks again. A 👍 is worth keeping too, as a known-good baseline to make sure future changes don't regress it. Either way, the golden set stays grounded in what users actually ask, not what the team assumes they'll ask.</p>
     </section>
 
     <!-- RUNNING EVALS -->
