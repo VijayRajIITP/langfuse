@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DeepEval — Team Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:        #fbfbf9;
+    --surface:      #ffffff;
+    --code-bg:      #f4f5f3;
+    --ink:          #1f2725;
+    --ink-soft:     #5a6663;
+    --ink-faint:    #8c9793;
+    --rule:         #e2e5e1;
+    --rule-strong:  #cfd4cf;
+    --accent:       #0d6e73;
+    --accent-soft:  #e2f0ef;
+    --amber:        #9a6206;
+    --amber-soft:   #fdf3e0;
+    --tok-comment:  #7b8783;
+    --tok-string:   #9a5b2c;
+    --tok-key:      #0d6e73;
+    --shadow:       0 1px 2px rgba(28,40,38,.05);
+    --radius:       6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181a; --surface: #191e20; --code-bg: #101416;
+      --ink: #e4e9e7; --ink-soft: #a3aead; --ink-faint: #78827f;
+      --rule: #2a3134; --rule-strong: #3a4347;
+      --accent: #5ec8c4; --accent-soft: #16302f;
+      --amber: #e0ad5a; --amber-soft: #2a2317;
+      --tok-comment: #6d7a78; --tok-string: #d9a273; --tok-key: #5ec8c4;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14181a; --surface: #191e20; --code-bg: #101416;
+    --ink: #e4e9e7; --ink-soft: #a3aead; --ink-faint: #78827f;
+    --rule: #2a3134; --rule-strong: #3a4347;
+    --accent: #5ec8c4; --accent-soft: #16302f;
+    --amber: #e0ad5a; --amber-soft: #2a2317;
+    --tok-comment: #6d7a78; --tok-string: #d9a273; --tok-key: #5ec8c4;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html {
+    -webkit-text-size-adjust: 100%; scroll-behavior: smooth;
+    scroll-padding-top: env(safe-area-inset-top, 0px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.62;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .shell {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+
+  header.masthead {
+    grid-column: 1 / -1;
+    padding: 56px 0 28px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 44px;
+  }
+  .kicker { font-size: 13px; color: var(--accent); font-weight: 600; margin: 0 0 10px; }
+  h1 { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -.018em; margin: 0 0 12px; max-width: 26ch; }
+  .standfirst { margin: 0; color: var(--ink-soft); max-width: 68ch; font-size: 15.5px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .fact {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--ink-soft);
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: 999px; padding: 3px 11px;
+  }
+  .fact b { color: var(--ink); font-weight: 500; }
+
+  nav.toc {
+    position: sticky; top: 28px;
+    font-size: 13.5px; line-height: 1.45;
+    max-height: calc(100vh - 56px); overflow-y: auto;
+  }
+  nav.toc h2 { font-size: 13px; font-weight: 600; color: var(--ink-faint); margin: 0 0 12px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--rule); }
+  nav.toc a {
+    display: block; padding: 5px 0 5px 14px; margin-left: -1px;
+    border-left: 2px solid transparent; color: var(--ink-soft); text-decoration: none;
+  }
+  nav.toc a:hover { color: var(--ink); }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 500; }
+  nav.toc .sub a { padding-left: 26px; font-size: 13px; color: var(--ink-faint); }
+  nav.toc .sub a:hover { color: var(--ink-soft); }
+
+  main { min-width: 0; }
+  section + section { margin-top: 56px; }
+  h2.part { font-size: 21px; font-weight: 700; letter-spacing: -.012em; margin: 0 0 6px; scroll-margin-top: 24px; }
+  .part-note { color: var(--ink-soft); margin: 0 0 28px; max-width: 66ch; }
+  h3 { font-size: 16px; font-weight: 600; margin: 0 0 8px; scroll-margin-top: 24px; }
+  h4.mini { font-size: 13.5px; font-weight: 600; margin: 22px 0 6px; color: var(--ink-soft); }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  ol.steps > li { position: relative; padding: 0 0 34px 46px; counter-increment: step; }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: -1px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--rule-strong); color: var(--ink-soft);
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px;
+    display: grid; place-items: center;
+  }
+  ol.steps > li::after {
+    content: ""; position: absolute; left: 13px; top: 30px; bottom: 4px; width: 1px; background: var(--rule);
+  }
+  ol.steps > li:last-child { padding-bottom: 4px; }
+  ol.steps > li:last-child::after { display: none; }
+  ol.steps > li.key::before { background: var(--accent); border-color: var(--accent); color: var(--paper); font-weight: 700; }
+
+  ul.plain { margin: 0 0 14px; padding-left: 18px; max-width: 66ch; }
+  ul.plain li { margin-bottom: 5px; }
+  ul.plain li::marker { color: var(--ink-faint); }
+
+  code.inline {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .86em; background: var(--code-bg); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 1px 5px; color: var(--ink); word-break: break-word;
+  }
+
+  .block {
+    position: relative; margin: 14px 0 18px;
+    background: var(--code-bg); border: 1px solid var(--rule);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .block-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 6px 10px 6px 14px; border-bottom: 1px solid var(--rule);
+  }
+  .block-lang { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--ink-faint); }
+  .copy {
+    font: inherit; font-size: 12px; color: var(--ink-soft);
+    background: transparent; border: 1px solid var(--rule-strong);
+    border-radius: 4px; padding: 2px 9px; cursor: pointer;
+  }
+  .copy:hover { color: var(--ink); border-color: var(--ink-faint); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy.done { color: var(--accent); border-color: var(--accent); }
+  pre {
+    margin: 0; padding: 13px 14px 15px; overflow-x: auto;
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.8px; line-height: 1.62; tab-size: 4;
+  }
+  pre code { font: inherit; color: var(--ink); }
+  .tok-comment { color: var(--tok-comment); font-style: italic; }
+  .tok-string  { color: var(--tok-string); }
+  .tok-key     { color: var(--tok-key); }
+
+  .note {
+    border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 11px 15px; margin: 16px 0 18px; max-width: 68ch;
+  }
+  .note.warn { border-left-color: var(--amber); background: var(--amber-soft); }
+  .note p { margin: 0; font-size: 14.2px; }
+  .note p + p { margin-top: 8px; }
+  .note strong { font-weight: 600; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+    border-radius: var(--radius); overflow: hidden; margin: 16px 0 8px;
+  }
+  .grid div { background: var(--surface); padding: 12px 14px; }
+  .grid h4 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; }
+  .grid p { margin: 0; font-size: 13px; color: var(--ink-soft); }
+
+  .table-wrap { overflow-x: auto; margin: 18px 0; border: 1px solid var(--rule); border-radius: var(--radius); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.6px; background: var(--surface); }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 600; color: var(--ink); background: var(--code-bg); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.4px; }
+
+  .tabs { border-bottom: 1px solid var(--rule); display: flex; gap: 4px; margin-bottom: 22px; overflow-x: auto; }
+  .tabs button {
+    font: inherit; font-size: 14px; font-weight: 500;
+    background: transparent; border: 0; border-bottom: 2px solid transparent;
+    color: var(--ink-soft); padding: 8px 12px; margin-bottom: -1px; cursor: pointer; white-space: nowrap;
+  }
+  .tabs button:hover { color: var(--ink); }
+  .tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  [role="tabpanel"][hidden] { display: none; }
+
+  .qa + .qa { border-top: 1px solid var(--rule); padding-top: 16px; margin-top: 16px; }
+
+  footer {
+    grid-column: 1 / -1; margin-top: 64px; padding-top: 20px;
+    border-top: 1px solid var(--rule); font-size: 13.5px; color: var(--ink-soft);
+  }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; gap: 0; padding: 0 18px 72px; }
+    nav.toc { position: static; max-height: none; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
+    nav.toc ol { display: flex; flex-wrap: wrap; gap: 4px 16px; border-left: 0; }
+    nav.toc a { padding: 2px 0; border-left: 0; }
+    nav.toc .sub { display: none; }
+    header.masthead { padding-top: 40px; margin-bottom: 32px; }
+    h1 { font-size: 25px; }
+    ol.steps > li { padding-left: 38px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="masthead">
+    <p class="kicker">Team guide</p>
+    <h1>DeepEval: testing framework for LLM apps</h1>
+    <p class="standfirst">DeepEval unit-tests LLM outputs with Pytest-style assertions and 50+ built-in metrics. It runs locally, gates merges in CI, and evaluates agents, RAG pipelines, and chatbots without leaving Python.</p>
+    <div class="facts">
+      <span class="fact">install <b>pip install -U deepeval</b></span>
+      <span class="fact">run <b>deepeval test run</b></span>
+      <span class="fact">cost <b>local-first, no account needed</b></span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="On this page">
+    <h2>On this page</h2>
+    <ol>
+      <li><a href="#what-is">1. What is DeepEval</a></li>
+      <li><a href="#getting-started">2. Getting started</a></li>
+      <li class="sub"><a href="#getting-started">By hand</a></li>
+      <li class="sub"><a href="#getting-started">By coding agent</a></li>
+      <li><a href="#building-blocks">3. Core building blocks</a></li>
+      <li><a href="#eval-modes">4. Three eval modes</a></li>
+      <li><a href="#agent-metrics">5. Agent metrics</a></li>
+      <li><a href="#rag-metrics">6. RAG metrics</a></li>
+      <li class="sub"><a href="#rag-metrics">The RAG Triad</a></li>
+      <li class="sub"><a href="#rag-metrics">Building the golden dataset</a></li>
+      <li><a href="#running-evals">7. Running evals</a></li>
+      <li class="sub"><a href="#running-evals">Test run vs evaluate()</a></li>
+      <li class="sub"><a href="#running-evals">Component-level</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- WHAT IS -->
+    <section id="what-is">
+      <h2 class="part">1. What is DeepEval</h2>
+      <p class="part-note">An open-source framework for unit-testing LLM output, built around a test case, a metric, and — optionally — a dataset.</p>
+
+      <ul class="plain">
+        <li>50+ ready-to-use metrics: LLM-as-judge, agent, tool-use, conversational, safety, RAG, multimodal</li>
+        <li>Evaluates agents, chatbots, RAG pipelines, MCP systems, and custom workflows</li>
+        <li>Runs end-to-end, component-level, and trajectory-based evals</li>
+        <li>Generates synthetic datasets for edge cases that are hard to collect by hand</li>
+      </ul>
+
+      <div class="note">
+        <p><strong>Local-first.</strong> Evaluations run in your own environment — no account required. When the team wants shared dashboards, regression tracking, or production monitoring, DeepEval connects natively to <a href="https://www.confident-ai.com">Confident AI</a>.</p>
+      </div>
+    </section>
+
+    <!-- GETTING STARTED -->
+    <section id="getting-started">
+      <h2 class="part">2. Getting started</h2>
+      <p class="part-note">Two paths in — pick whichever matches how the team works.</p>
+
+      <div class="tabs" role="tablist" aria-label="Getting started paths">
+        <button role="tab" id="tab-hand" aria-controls="panel-hand" aria-selected="true">By hand</button>
+        <button role="tab" id="tab-agent" aria-controls="panel-agent" aria-selected="false" tabindex="-1">By coding agent</button>
+      </div>
+
+      <div role="tabpanel" id="panel-hand" aria-labelledby="tab-hand" tabindex="0">
+        <ol class="steps">
+          <li>
+            <h3>Install</h3>
+            <div class="block">
+              <div class="block-bar"><span class="block-lang">bash</span><button class="copy" type="button">Copy</button></div>
+              <pre><code data-lang="bash">pip install -U deepeval</code></pre>
+            </div>
+          </li>
+          <li>
+            <h3>Write a test case</h3>
+            <div class="block">
+              <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+              <pre><code data-lang="python">from deepeval import assert_test
+from deepeval.metrics import AnswerRelevancyMetric
+from deepeval.test_case import LLMTestCase
+
+def test_answer_relevancy():
+    metric = AnswerRelevancyMetric(threshold=0.5)
+    test_case = LLMTestCase(
+        input="What if these shoes don't fit?",
+        actual_output="We offer a 30-day full refund at no extra cost.",
+        retrieval_context=["All customers get a 30 day full refund."]
+    )
+    assert_test(test_case, [metric])</code></pre>
+            </div>
+          </li>
+          <li class="key">
+            <h3>Run it</h3>
+            <div class="block">
+              <div class="block-bar"><span class="block-lang">bash</span><button class="copy" type="button">Copy</button></div>
+              <pre><code data-lang="bash">deepeval test run test_example.py</code></pre>
+            </div>
+            <p>Set <code class="inline">OPENAI_API_KEY</code> (or point at another provider) first — most metrics use an LLM judge.</p>
+          </li>
+        </ol>
+      </div>
+
+      <div role="tabpanel" id="panel-agent" aria-labelledby="tab-agent" tabindex="0" hidden>
+        <p>Install the DeepEval Agent Skill and let Cursor, Claude Code, Codex, or Windsurf pick the right test shape, write the suite, and iterate on failures.</p>
+        <div class="block">
+          <div class="block-bar"><span class="block-lang">bash</span><button class="copy" type="button">Copy</button></div>
+          <pre><code data-lang="bash">npx skills add confident-ai/deepeval --skill "deepeval"</code></pre>
+        </div>
+        <p>Then paste the starter prompt from the <a href="https://deepeval.com/docs/vibe-coder-quickstart">Vibe Coder Quickstart</a> and point it at your app.</p>
+      </div>
+
+      <h3>Use-case quickstarts</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Use case</th><th>Covers</th></tr></thead>
+          <tbody>
+            <tr><td>Agents</td><td>Tracing, end-to-end task completion, per-component scoring</td></tr>
+            <tr><td>Chatbots</td><td>Multi-turn conversations, turns, simulated user interactions</td></tr>
+            <tr><td>RAG</td><td>End-to-end quality, retrieval and generation tested separately</td></tr>
+            <tr><td>MCP</td><td>MCP clients across single-turn and multi-turn interactions</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- BUILDING BLOCKS -->
+    <section id="building-blocks">
+      <h2 class="part">3. Core building blocks</h2>
+      <p class="part-note">Four concepts that show up throughout DeepEval.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concept</th><th>Definition</th></tr></thead>
+          <tbody>
+            <tr><td>Test Case</td><td>One behavior to evaluate: input, output, expected behavior, tools, context, metadata</td></tr>
+            <tr><td>Dataset</td><td>A collection of goldens that makes evals repeatable across prompts, models, and releases</td></tr>
+            <tr><td>Metric</td><td>The scoring logic that decides whether a response, trace, span, or output meets criteria</td></tr>
+            <tr><td>Trace</td><td>A runtime record of an agent's steps, spans, inputs, outputs, tool calls, and component behavior</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- EVAL MODES -->
+    <section id="eval-modes">
+      <h2 class="part">4. Three eval modes</h2>
+      <p class="part-note">Combine all three: score the black-box result, evaluate the full trajectory, then inspect spans to find failures.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mode</th><th>Best for</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td>End-to-end</td><td>Raw LLM APIs, simple apps, chatbots</td><td>Treats the app as a black box — inputs, outputs, expected behavior, metrics</td></tr>
+            <tr><td>Component-level</td><td>Agents, tool-using workflows, MCP systems</td><td>Traces the app and scores individual spans, tools, retrievers, generators</td></tr>
+            <tr><td>Trajectory-based</td><td>Long-horizon agents whose path affects quality</td><td>Scores the whole chain of plans, calls, tools, and handoffs as one trajectory</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- AGENT METRICS -->
+    <section id="agent-metrics">
+      <h2 class="part">5. Agent metrics</h2>
+      <p class="part-note">Six metrics purpose-built for agents, spanning three layers of the agent loop.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Does</th><th>Metrics</th></tr></thead>
+          <tbody>
+            <tr><td>Reasoning</td><td>Plans the task, picks a strategy</td><td>Plan Quality, Plan Adherence</td></tr>
+            <tr><td>Action</td><td>Selects tools, generates arguments</td><td>Tool Correctness, Argument Correctness</td></tr>
+            <tr><td>Execution</td><td>Runs the full loop to a result</td><td>Task Completion, Step Efficiency</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Why it matters</th><th>Calculated as (plain language)</th></tr></thead>
+          <tbody>
+            <tr><td>Plan&nbsp;Quality</td><td>Trajectory</td><td>Referenceless</td><td>Catches a flawed strategy before execution wastes effort following it</td><td><strong>Checks whether the plan is logical, complete, and efficient for the task.</strong> An LLM judge reads the task + plan from the trace and scores the match; no plan detected → passes at 1.</td></tr>
+            <tr><td>Plan&nbsp;Adherence</td><td>Trajectory</td><td>Referenceless</td><td>A good plan means nothing if the agent drifts from it mid-run</td><td><strong>Checks whether execution actually followed the stated plan.</strong> An LLM judge reads the task, plan, and what actually ran, then scores how closely they line up.</td></tr>
+            <tr><td>Tool&nbsp;Correctness</td><td>Component-level</td><td>Reference-based — needs <code>expected_tools</code></td><td>Catches wrong or missing tool calls, independent of answer quality</td><td><strong>Checks whether the right tools were called.</strong> Correct tool calls ÷ total tool calls, exact-match by default (name, args, output, or order — configurable).</td></tr>
+            <tr><td>Argument&nbsp;Correctness</td><td>Component-level</td><td>Referenceless</td><td>Right tool, wrong arguments still breaks the task</td><td><strong>Checks whether the right arguments were generated for each tool call.</strong> Correct arguments ÷ total tool calls; an LLM judge checks them against the input context, not a fixed expected value.</td></tr>
+            <tr><td>Task&nbsp;Completion</td><td>Trajectory</td><td>Referenceless</td><td>The top-level pass/fail signal — everything else is diagnostic</td><td><strong>Checks whether the agent actually accomplished the task.</strong> An LLM judge reads the task (given or inferred) + final outcome and scores how fully it was satisfied.</td></tr>
+            <tr><td>Step&nbsp;Efficiency</td><td>Trajectory</td><td>Referenceless</td><td>A working agent burning 3x the tokens/latency it needs isn't production-ready</td><td><strong>Checks whether the agent finished without wasted steps.</strong> An LLM judge reads the task + every execution step and penalizes redundant calls or loops.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <p><strong>Rule of thumb:</strong> trajectory metrics need the whole trace (<code class="inline">evals_iterator(metrics=[...])</code>); component-level metrics attach to one span — the LLM call that picks a tool and its arguments (<code class="inline">@observe(metrics=[...])</code>).</p>
+      </div>
+    </section>
+
+    <!-- RAG METRICS -->
+    <section id="rag-metrics">
+      <h2 class="part">6. RAG metrics</h2>
+      <p class="part-note">Five metrics split across the two halves of a RAG pipeline — the retriever fetches chunks, the generator turns them into an answer — each targeting a specific hyperparameter.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Handles</th><th>Metrics</th></tr></thead>
+          <tbody>
+            <tr><td>Retriever</td><td>Fetches text chunks from the knowledge base</td><td>Contextual Precision, Contextual Recall, Contextual Relevancy</td></tr>
+            <tr><td>Generator</td><td>Turns retrieved chunks + query into an answer</td><td>Answer Relevancy, Faithfulness</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Targets</th><th>Why it matters</th><th>Calculated as (plain language)</th></tr></thead>
+          <tbody>
+            <tr><td>Contextual&nbsp;Precision</td><td>Retriever</td><td>Reference-based — needs <code>expected_output</code></td><td>Reranker</td><td>A weak reranker buries the right answer under noise, even after retrieving it</td><td><strong>Checks whether the reranker puts relevant chunks above irrelevant ones.</strong> An LLM judge compares chunk order against the ideal answer.</td></tr>
+            <tr><td>Contextual&nbsp;Recall</td><td>Retriever</td><td>Reference-based — needs <code>expected_output</code></td><td>Embedding model</td><td>Missing information at retrieval time can't be fixed by the generator later</td><td><strong>Checks whether retrieval captured everything the ideal answer needs.</strong> An LLM judge checks <code>retrieval_context</code> against <code>expected_output</code> for gaps.</td></tr>
+            <tr><td>Contextual&nbsp;Relevancy</td><td>Retriever</td><td>Referenceless</td><td>Chunk size, top-K</td><td>Flags a chunk-size / top-K / embedding mismatch feeding noise downstream</td><td><strong>Checks what share of retrieved chunks are actually relevant to the input.</strong> An LLM judge scores each chunk and flags noise.</td></tr>
+            <tr><td>Answer&nbsp;Relevancy</td><td>Generator</td><td>Referenceless</td><td>Prompt template</td><td>Catches vague, padded, or off-topic answers even when retrieval was fine</td><td><strong>Checks whether the answer stays focused on the input.</strong> An LLM judge scores how directly <code>actual_output</code> addresses the question.</td></tr>
+            <tr><td>Faithfulness</td><td>Generator</td><td>Referenceless</td><td>The LLM itself</td><td>Catches hallucination — claims not backed by any retrieved chunk</td><td><strong>Checks whether the answer sticks to what was retrieved.</strong> An LLM judge compares every claim in <code>actual_output</code> against <code>retrieval_context</code> for contradictions.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <p><strong>Same field, different job:</strong> Contextual Precision and Contextual Recall both read <code class="inline">expected_output</code>, but one checks ranking, the other checks completeness.</p>
+      </div>
+
+      <h3>The RAG Triad</h3>
+      <p>Answer Relevancy + Faithfulness + Contextual Relevancy are all referenceless — no <code class="inline">expected_output</code> needed. High scores across all three is a solid signal the pipeline's hyperparameters are dialed in, without any labeled data. Add Contextual Precision and Recall on top only when labeled outputs are available, for stricter retrieval checks.</p>
+
+      <h3>Building the golden dataset</h3>
+      <p>A golden is a lightweight template — just an <code class="inline">input</code> and an <code class="inline">expected_output</code> — not a full test case yet. Two ways to get one:</p>
+      <ul class="plain">
+        <li><strong>By hand</strong>: a plain JSON list, one entry per question — <code class="inline">{"id": "G01", "input": "...", "expected_output": "..."}</code>. This is what the tuning example below loops over.</li>
+        <li><strong>Generated</strong>: <code class="inline">Synthesizer.generate_goldens_from_docs(document_paths=[...])</code> creates goldens straight from your own knowledge-base files when you don't have one yet.</li>
+      </ul>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.synthesizer import Synthesizer
+from deepeval.dataset import EvaluationDataset
+
+synthesizer = Synthesizer()
+goldens = synthesizer.generate_goldens_from_docs(
+    document_paths=["policy.txt", "handbook.pdf"]
+)
+dataset = EvaluationDataset(goldens=goldens)</code></pre>
+      </div>
+      <p>Either way, a golden stores neither <code class="inline">retrieval_context</code> nor <code class="inline">actual_output</code> — those get filled in live, at evaluation time, by actually calling your retriever (and generator).</p>
+    </section>
+
+    <!-- RUNNING EVALS -->
+    <section id="running-evals">
+      <h2 class="part">7. Running evals</h2>
+      <p class="part-note">Every eval needs a test case and a metric with a threshold to decide pass/fail; a dataset groups many test cases for a bulk run.</p>
+
+      <div class="note">
+        <p>A test case passes only if every threshold-carrying metric passes. <code class="inline">threshold=None</code> still scores but doesn't gate; <code class="inline">flaky=True</code> warns instead of failing the run.</p>
+      </div>
+
+      <p><strong>Dataset</strong> = a collection of goldens (test case templates). <strong>Synthesizer</strong> generates goldens straight from your own docs when you don't have a dataset yet.</p>
+
+      <h3>Test run vs evaluate()</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Run it via</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr><td><code>deepeval test run</code></td><td>CI/CD, pytest-style, gates merges</td></tr>
+            <tr><td><code>evaluate()</code></td><td>Scripts and notebooks, parallel, no CLI</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Component-level</h3>
+      <p>Wrap any function with <code class="inline">@observe(metrics=[...])</code> to score a nested span — a retriever, a tool, a sub-agent — instead of just the final output.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.tracing import observe, update_current_span
+from deepeval.metrics import AnswerRelevancyMetric
+from deepeval.test_case import LLMTestCase
+
+@observe(metrics=[AnswerRelevancyMetric()])
+def complete(query: str):
+    response = call_llm(query)
+    update_current_span(
+        test_case=LLMTestCase(input=query, actual_output=response)
+    )
+    return response</code></pre>
+      </div>
+
+      <p><strong>Framework integrations</strong> auto-capture traces so this isn't wired up by hand: LangChain, Pydantic AI, AWS AgentCore, Google ADK (Python) · LangChain, Mastra, Vercel AI SDK, LangGraph (TypeScript).</p>
+    </section>
+
+  </main>
+
+  <footer>
+    <p style="margin:0">Covers the introduction, evaluation-introduction, getting-started, AI agent evaluation metrics, RAG evaluation, and RAG triad pages. Send over the next DeepEval docs page and it lands here as a new section.</p>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var KEYWORDS = /^(import|from|as|def|return|if|else|elif|for|in|while|try|except|finally|with|class|lambda|True|False|None|and|or|not|print|export|pip|install|npx)$/;
+
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function highlight(code) {
+    var text = code.textContent;
+    var re = /("""[\s\S]*?"""|'''[\s\S]*?'''|"[^"\n]*"|'[^'\n]*')|(#[^\n]*)|([A-Za-z_]+)/g;
+    var out = "", last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      out += esc(text.slice(last, m.index));
+      if (m[1]) {
+        out += '<span class="tok-string">' + esc(m[1]) + "</span>";
+      } else if (m[2]) {
+        out += '<span class="tok-comment">' + esc(m[2]) + "</span>";
+      } else if (m[3] && KEYWORDS.test(m[3])) {
+        out += '<span class="tok-key">' + esc(m[3]) + "</span>";
+      } else {
+        out += esc(m[0]);
+      }
+      last = m.index + m[0].length;
+    }
+    out += esc(text.slice(last));
+    code.innerHTML = out;
+  }
+
+  document.querySelectorAll("pre code[data-lang]").forEach(highlight);
+
+  document.querySelectorAll(".copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.closest(".block").querySelector("code").textContent;
+      var done = function () {
+        btn.textContent = "Copied";
+        btn.classList.add("done");
+        setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {});
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+
+  // tabs
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    });
+  }
+  tabs.forEach(function (tab, i) {
+    tab.addEventListener("click", function () { select(tab); });
+    tab.addEventListener("keydown", function (e) {
+      var next = null;
+      if (e.key === "ArrowRight") next = tabs[(i + 1) % tabs.length];
+      if (e.key === "ArrowLeft") next = tabs[(i - 1 + tabs.length) % tabs.length];
+      if (next) { e.preventDefault(); select(next); next.focus(); }
+    });
+  });
+
+  // scroll spy
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a"));
+  var seen = {};
+  var targets = [];
+  links.forEach(function (a) {
+    var id = a.getAttribute("href").slice(1);
+    if (seen[id]) return;
+    seen[id] = true;
+    var el = document.getElementById(id);
+    if (el) targets.push(el);
+  });
+
+  if ("IntersectionObserver" in window && targets.length) {
+    var visible = {};
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+      var current = null;
+      for (var i = 0; i < targets.length; i++) {
+        if (visible[targets[i].id]) { current = targets[i].id; break; }
+      }
+      if (current) {
+        links.forEach(function (a) {
+          a.classList.toggle("active", a.getAttribute("href") === "#" + current);
+        });
+      }
+    }, { rootMargin: "-10% 0px -70% 0px", threshold: 0 });
+    targets.forEach(function (t) { obs.observe(t); });
+  }
+})();
+</script>
+
+</body>
+</html>
