@@ -260,7 +260,8 @@
       <li><a href="#rag-metrics">6. RAG metrics</a></li>
       <li class="sub"><a href="#rag-metrics">The RAG Triad</a></li>
       <li class="sub"><a href="#rag-metrics">Building the golden dataset</a></li>
-      <li><a href="#running-evals">7. Running evals</a></li>
+      <li><a href="#arena-geval">7. Arena G-Eval</a></li>
+      <li><a href="#running-evals">8. Running evals</a></li>
       <li class="sub"><a href="#running-evals">Test run vs evaluate()</a></li>
       <li class="sub"><a href="#running-evals">Component-level</a></li>
     </ol>
@@ -489,9 +490,57 @@ dataset = EvaluationDataset(goldens=goldens)</code></pre>
       <p>On production feedback: a 👎 on a real response flags a genuine failure mode worth turning into a regression golden — the exact case that broke, kept so it never quietly breaks again. A 👍 is worth keeping too, as a known-good baseline to make sure future changes don't regress it. Either way, the golden set stays grounded in what users actually ask, not what the team assumes they'll ask.</p>
     </section>
 
+    <!-- ARENA G-EVAL -->
+    <section id="arena-geval">
+      <h2 class="part">7. Arena G-Eval — picking a winner</h2>
+
+      <p><strong>What it's for:</strong> every metric so far scores one output against a bar — a threshold decides pass or fail. Arena G-Eval answers a different question entirely: not "is this good enough" but "which of these is better." Hand it two or more "contestants" — different prompts, models, or configs run on the same input — and it names a winner instead of a score.</p>
+
+      <p><strong>When to use it:</strong> comparing two prompt versions, two models (GPT-4 vs. Claude, say), or two configs on the same task — anywhere the real question is relative, not absolute. It's also more reliable than eyeballing two separate <code class="inline">GEval</code> scores side by side, since a per-output score carries its own noise; a direct head-to-head doesn't.</p>
+
+      <p><strong>How it avoids bias:</strong> a blind, randomized-position, pairwise LLM-judge. Names and order are hidden and shuffled, so the judge can't just favor whichever answer happened to come first or ran longer.</p>
+
+      <p><strong>No score, no threshold:</strong> it ranks rather than passing a bar. Read <code class="inline">metric.winner</code> and <code class="inline">metric.reason</code>, not a numeric score.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Regular metrics (e.g. GEval)</th><th>Arena G-Eval</th></tr></thead>
+          <tbody>
+            <tr><td>Question answered</td><td>Is this output good enough?</td><td>Which output is better?</td></tr>
+            <tr><td>Input</td><td>One test case</td><td>Multiple contestants — same input, different outputs</td></tr>
+            <tr><td>Result</td><td>Score vs. threshold</td><td>Winner + reason</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.test_case import ArenaTestCase, LLMTestCase, SingleTurnParams, Contestant
+from deepeval.metrics import ArenaGEval
+from deepeval import compare
+
+a_test_case = ArenaTestCase(
+    contestants=[
+        Contestant(name="GPT-4", hyperparameters={"model": "gpt-4"},
+                   test_case=LLMTestCase(input="What is the capital of France?", actual_output="Paris")),
+        Contestant(name="Claude-4", hyperparameters={"model": "claude-4"},
+                   test_case=LLMTestCase(input="What is the capital of France?", actual_output="Paris is the capital of France.")),
+    ]
+)
+
+metric = ArenaGEval(
+    name="Friendly",
+    criteria="Choose the more friendly response",
+    evaluation_params=[SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT],
+)
+
+compare(test_cases=[a_test_case], metric=metric)</code></pre>
+      </div>
+    </section>
+
     <!-- RUNNING EVALS -->
     <section id="running-evals">
-      <h2 class="part">7. Running evals</h2>
+      <h2 class="part">8. Running evals</h2>
       <p class="part-note">Every eval needs a test case and a metric with a threshold to decide pass/fail; a dataset groups many test cases for a bulk run.</p>
 
       <div class="note">
