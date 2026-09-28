@@ -260,10 +260,14 @@
       <li><a href="#rag-metrics">6. RAG metrics</a></li>
       <li class="sub"><a href="#rag-metrics">The RAG Triad</a></li>
       <li class="sub"><a href="#rag-metrics">Building the golden dataset</a></li>
-      <li><a href="#arena-geval">7. Arena G-Eval</a></li>
-      <li><a href="#running-evals">8. Running evals</a></li>
+      <li><a href="#g-eval">7. G-Eval</a></li>
+      <li><a href="#dag">8. DAG</a></li>
+      <li><a href="#arena-geval">9. Arena G-Eval</a></li>
+      <li><a href="#non-llm-metrics">10. Non-LLM metrics</a></li>
+      <li><a href="#running-evals">11. Running evals</a></li>
       <li class="sub"><a href="#running-evals">Test run vs evaluate()</a></li>
       <li class="sub"><a href="#running-evals">Component-level</a></li>
+      <li class="sub"><a href="#running-evals">Trajectory-level</a></li>
     </ol>
   </nav>
 
@@ -490,9 +494,172 @@ dataset = EvaluationDataset(goldens=goldens)</code></pre>
       <p>On production feedback: a 👎 on a real response flags a genuine failure mode worth turning into a regression golden — the exact case that broke, kept so it never quietly breaks again. A 👍 is worth keeping too, as a known-good baseline to make sure future changes don't regress it. Either way, the golden set stays grounded in what users actually ask, not what the team assumes they'll ask.</p>
     </section>
 
+    <!-- G-EVAL -->
+    <section id="g-eval">
+      <h2 class="part">7. G-Eval — custom criteria in plain English</h2>
+
+      <p><strong>What it's for:</strong> every other metric here checks one fixed thing — relevancy, faithfulness, tool calls. G-Eval lets you define your own criteria in a sentence or two — tone, safety, completeness, whatever the app actually needs — without writing a custom scorer from scratch. It's the metric Arena G-Eval below is itself adapted from.</p>
+
+      <p><strong>How it works, in three steps:</strong></p>
+      <ol class="steps">
+        <li><h3>Generate steps</h3><p>Your plain-language <code class="inline">criteria</code> gets turned into a structured list of <code class="inline">evaluation_steps</code> (chain-of-thought).</p></li>
+        <li><h3>Judge</h3><p>An LLM judge scores the output against those steps.</p></li>
+        <li class="key"><h3>Score</h3><p>The steps are weighted by token log-probabilities into one final score.</p></li>
+      </ol>
+      <p>Breaking one fuzzy criterion into several smaller steps is what makes this more consistent than just asking an LLM "rate this 1–5" directly — simpler sub-questions are easier for a judge to answer the same way twice.</p>
+
+      <p><strong><code class="inline">criteria</code> vs <code class="inline">evaluation_steps</code></strong> — provide one or the other, never both:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th><code>criteria</code></th><th><code>evaluation_steps</code></th></tr></thead>
+          <tbody>
+            <tr><td>Setup</td><td>One sentence; DeepEval generates the steps for you</td><td>Write the steps yourself</td></tr>
+            <tr><td>Best for</td><td>Early iteration — fast to try ideas</td><td>A metric you've settled on — more stable, easier to fine-tune</td></tr>
+            <tr><td>Trade-off</td><td>Step generation is itself probabilistic — slight run-to-run variation</td><td>More upfront effort, but consistent and directly tunable</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCaseParams
+
+correctness_metric = GEval(
+    name="Correctness",
+    criteria="Determine whether the actual output is factually correct based on the expected output.",
+    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT],
+)</code></pre>
+      </div>
+
+      <h3>The 7 most common G-Eval metrics</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>Needs a reference?</th><th>Checks</th></tr></thead>
+          <tbody>
+            <tr><td>Answer Correctness</td><td>Yes — <code>expected_output</code></td><td>Does the output match the expected answer?</td></tr>
+            <tr><td>Coherence</td><td>No</td><td>Is the response logically and clearly structured?</td></tr>
+            <tr><td>Tonality</td><td>No</td><td>Does the tone/style match what's intended — professional, empathetic, etc.?</td></tr>
+            <tr><td>Safety</td><td>No</td><td>Is the output free of harmful, biased, or unsafe content?</td></tr>
+            <tr><td>Custom RAG</td><td>Yes — <code>retrieval_context</code></td><td>Domain-specific faithfulness/quality beyond the built-in RAG metrics</td></tr>
+            <tr><td>Summarization</td><td>Yes — <code>input</code></td><td>Does the summary preserve key facts without hallucinating?</td></tr>
+            <tr><td>Completeness</td><td>Yes — <code>input</code></td><td>Does the response address every part of the question — not just Answer Relevancy's "is it on-topic"</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>On agents:</strong> G-Eval also runs component-level via <code class="inline">@observe(metrics=[...])</code>. A common use is <em>handoff correctness</em> — did a supervisor agent route the task to the right neighboring agent?</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.tracing import observe
+from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCaseParams
+
+handoff_correctness = GEval(
+    name="Handoff Correctness",
+    criteria="Was the task handed off to the correct neighboring agent?",
+    evaluation_params=[LLMTestCaseParams.INPUT],
+)
+
+@observe(type="agent", metrics=[handoff_correctness])
+def supervisor_agent():
+    ...</code></pre>
+      </div>
+
+      <p><strong>Going further, briefly:</strong></p>
+      <ul class="plain">
+        <li><strong>Rubrics</strong> — instead of one blended score, define separate scored criteria with their own ranges (e.g. fluency 0–3, logical flow 0–3, linguistic flow 0–4) for more interpretable, fine-grained results.</li>
+        <li><strong>DAG</strong> — for when a requirement is clear-cut rather than subjective, and needs a deterministic score every time. Covered next.</li>
+      </ul>
+    </section>
+
+    <!-- DAG -->
+    <section id="dag">
+      <h2 class="part">8. DAG — deterministic evaluation</h2>
+
+      <p><strong>What it's for:</strong> G-Eval is non-deterministic — the same output can score differently across runs. Fine for genuinely subjective calls (coherence, tone), wrong for anything with a clear right answer (does the summary have the required headings, in the required order?). DAG (Directed Acyclic Graph) fixes this by replacing one fuzzy judgment with a tree of small, atomic decisions — each node is one LLM judge answering one specific question, and edges route to the next node based on the answer. Smaller, sharper questions leave far less room for the judge to wobble.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Node</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><code>TaskNode</code></td><td>Extracts or prepares something from the test case (e.g. "extract all headings") for later nodes to judge</td></tr>
+            <tr><td><code>BinaryJudgementNode</code></td><td>A yes/no decision — routes to a different child for each</td></tr>
+            <tr><td><code>NonBinaryJudgementNode</code></td><td>A decision with more than two possible verdicts</td></tr>
+            <tr><td><code>VerdictNode</code></td><td>A leaf — assigns a score directly, or hands off to a child node (even a <code>GEval</code> metric) for further scoring</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>When to use it over G-Eval:</strong> don't start here — G-Eval takes minutes to set up and is better at genuinely subjective judgment. Reach for DAG once a requirement is clear-cut enough to write as a decision tree (format, structure, required fields, ordering), or move just that piece to DAG while G-Eval still handles the nuance.</p>
+
+      <p><strong>The best of both:</strong> use DAG to hard-gate a non-negotiable structural rule, then hand off to a <code class="inline">GEval</code> leaf for the nuanced part once that bar is cleared — so formatting mistakes score <code class="inline">0</code> outright, and everything that passes gets judged on actual quality.</p>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from deepeval.metrics import GEval, DAGMetric
+from deepeval.metrics.dag import (
+    DeepAcyclicGraph, TaskNode, BinaryJudgementNode, NonBinaryJudgementNode, VerdictNode,
+)
+
+# the nuanced part, used only once structure passes
+g_eval_summarization = GEval(
+    name="Summarization",
+    criteria="Determine how good a summary the 'actual output' is to the 'input'",
+    evaluation_params=[LLMTestCaseParams.INPUT, LLMTestCaseParams.ACTUAL_OUTPUT],
+)
+
+correct_order_node = NonBinaryJudgementNode(
+    criteria="Are the summary headings in order: 'intro' -> 'body' -> 'conclusion'?",
+    children=[
+        VerdictNode(verdict="Yes", g_eval=g_eval_summarization),  # hand off — structure is fine, judge quality
+        VerdictNode(verdict="Two are out of order", score=0),
+        VerdictNode(verdict="All out of order", score=0),
+    ],
+)
+
+correct_headings_node = BinaryJudgementNode(
+    criteria="Does the summary contain all three headings: 'intro', 'body', 'conclusion'?",
+    children=[
+        VerdictNode(verdict=False, score=0),
+        VerdictNode(verdict=True, child=correct_order_node),
+    ],
+)
+
+extract_headings_node = TaskNode(
+    instructions="Extract all headings in `actual_output`",
+    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+    output_label="Summary headings",
+    children=[correct_headings_node],
+)
+
+dag = DeepAcyclicGraph(root_nodes=[extract_headings_node])
+summarization_metric = DAGMetric(name="Summarization", dag=dag)
+
+summarization_metric.measure(LLMTestCase(input="your-original-text", actual_output="your-summary"))
+print(summarization_metric.score, summarization_metric.reason)</code></pre>
+      </div>
+
+      <h3>Why LLM judges need this help</h3>
+      <p>A few well-known failure modes explain why DAG, and several design choices already covered above, exist:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pitfall</th><th>What happens</th><th>How it's handled here</th></tr></thead>
+          <tbody>
+            <tr><td>Non-deterministic</td><td>Same output can score differently across runs</td><td>Use DAG for anything with a genuinely correct answer</td></tr>
+            <tr><td>Verbosity bias</td><td>Favors longer answers over better ones</td><td>Write criteria that explicitly reward concision or penalize padding</td></tr>
+            <tr><td>Narcissistic bias</td><td>A model may rate its own outputs slightly higher</td><td>Judge with a different model than the one being tested, where practical</td></tr>
+            <tr><td>Coarse scoring</td><td>Reliable on broad calls, noisier on fine-grained scales</td><td>G-Eval's token-probability weighting smooths this out</td></tr>
+            <tr><td>Position bias</td><td>In pairwise comparisons, favors whichever answer came first</td><td>This is exactly why Arena G-Eval blinds and randomizes position</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ARENA G-EVAL -->
     <section id="arena-geval">
-      <h2 class="part">7. Arena G-Eval — picking a winner</h2>
+      <h2 class="part">9. Arena G-Eval — picking a winner</h2>
 
       <p><strong>What it's for:</strong> every metric so far scores one output against a bar — a threshold decides pass or fail. Arena G-Eval answers a different question entirely: not "is this good enough" but "which of these is better." Hand it two or more "contestants" — different prompts, models, or configs run on the same input — and it names a winner instead of a score.</p>
 
@@ -538,9 +705,41 @@ compare(test_cases=[a_test_case], metric=metric)</code></pre>
       </div>
     </section>
 
+    <!-- NON-LLM METRICS -->
+    <section id="non-llm-metrics">
+      <h2 class="part">10. Non-LLM metrics</h2>
+      <p class="part-note">No LLM judge, no token cost, fully deterministic — same input always gives the same score. These check structure and exact matches, not meaning.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>Checks</th><th>Needs</th><th>Use it when</th></tr></thead>
+          <tbody>
+            <tr><td>Exact&nbsp;Match</td><td>Is <code>actual_output</code> identical, character-for-character, to <code>expected_output</code>?</td><td><code>input</code>, <code>actual_output</code>, <code>expected_output</code></td><td>There's exactly one right answer — labels, enum values, canned responses</td></tr>
+            <tr><td>Pattern&nbsp;Match</td><td>Does <code>actual_output</code> fully match a regex pattern?</td><td><code>input</code>, <code>actual_output</code> + a <code>pattern</code></td><td>Output needs a shape, not exact text — emails, dates, phone numbers, IDs</td></tr>
+            <tr><td>Json&nbsp;Correctness</td><td>Does <code>actual_output</code> parse into a given schema?</td><td><code>input</code>, <code>actual_output</code> + an <code>expected_schema</code></td><td>Checking structure — tool calls, function arguments, API responses</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.metrics import ExactMatchMetric, PatternMatchMetric, JsonCorrectnessMetric
+
+ExactMatchMetric()                                        # exact string match
+PatternMatchMetric(pattern=r"^[\w\.-]+@[\w\.-]+\.\w+$")  # regex match
+JsonCorrectnessMetric(expected_schema=MySchema)           # schema match</code></pre>
+      </div>
+
+      <ul class="plain">
+        <li><strong>Both are strict — full match only.</strong> A stray space or extra character scores 0. Pattern Match checks the whole output against the pattern (not "contains"), so wrap loose patterns in <code class="inline">.*...*</code> to match a fragment.</li>
+        <li><strong>Json Correctness never judges content, only structure.</strong> An LLM is only called to explain why a schema failed — never to score it.</li>
+        <li><strong>None of these fit open-ended output with many valid phrasings.</strong> Pair with an LLM-judge metric like Answer Relevancy instead.</li>
+      </ul>
+    </section>
+
     <!-- RUNNING EVALS -->
     <section id="running-evals">
-      <h2 class="part">8. Running evals</h2>
+      <h2 class="part">11. Running evals</h2>
       <p class="part-note">Every eval needs a test case and a metric with a threshold to decide pass/fail; a dataset groups many test cases for a bulk run.</p>
 
       <div class="note">
@@ -548,6 +747,23 @@ compare(test_cases=[a_test_case], metric=metric)</code></pre>
       </div>
 
       <p><strong>Dataset</strong> = a collection of goldens (test case templates). <strong>Synthesizer</strong> generates goldens straight from your own docs when you don't have a dataset yet.</p>
+
+      <p>Running a whole dataset (end-to-end) is the same loop every time: turn each golden into a test case, then evaluate the batch together.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval import evaluate
+from deepeval.dataset import EvaluationDataset, Golden
+from deepeval.test_case import LLMTestCase
+from deepeval.metrics import AnswerRelevancyMetric
+
+dataset = EvaluationDataset(goldens=[Golden(input="...")])
+for golden in dataset.goldens:
+    dataset.add_test_case(
+        LLMTestCase(input=golden.input, actual_output=your_app(golden.input))
+    )
+
+evaluate(dataset, [AnswerRelevancyMetric()])</code></pre>
+      </div>
 
       <h3>Test run vs evaluate()</h3>
       <div class="table-wrap">
@@ -575,6 +791,25 @@ def complete(query: str):
         test_case=LLMTestCase(input=query, actual_output=response)
     )
     return response</code></pre>
+      </div>
+
+      <h3>Trajectory-level</h3>
+      <p>Score the complete ordered trace instead of one span. Needed for trajectory metrics (Plan Quality, Plan Adherence, Task Completion, Step Efficiency). Run with <code class="inline">dataset.evals_iterator(metrics=[...])</code> instead of <code class="inline">@observe</code>.</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.tracing import observe
+from deepeval.dataset import Golden, EvaluationDataset
+from deepeval.metrics import TaskCompletionMetric
+
+@observe(type="agent")
+def travel_agent(user_input):
+    flights = search_flights("NYC", "Paris", "2025-03-15")
+    cheapest = min(flights, key=lambda x: x["price"])
+    return f"Booked flight {cheapest['id']}"
+
+dataset = EvaluationDataset(goldens=[Golden(input="Book the cheapest flight to Paris")])
+for golden in dataset.evals_iterator(metrics=[TaskCompletionMetric()]):
+    travel_agent(golden.input)</code></pre>
       </div>
 
       <p><strong>Framework integrations</strong> auto-capture traces so this isn't wired up by hand: LangChain, Pydantic AI, AWS AgentCore, Google ADK (Python) · LangChain, Mastra, Vercel AI SDK, LangGraph (TypeScript).</p>
