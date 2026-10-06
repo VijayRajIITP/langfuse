@@ -257,6 +257,7 @@
       <li><a href="#building-blocks">3. Core building blocks</a></li>
       <li><a href="#eval-modes">4. Three eval modes</a></li>
       <li><a href="#agent-metrics">5. Agent metrics</a></li>
+      <li class="sub"><a href="#agent-metrics">What's happening under the hood</a></li>
       <li><a href="#rag-metrics">6. RAG metrics</a></li>
       <li class="sub"><a href="#rag-metrics">The RAG Triad</a></li>
       <li class="sub"><a href="#rag-metrics">Building the golden dataset</a></li>
@@ -417,20 +418,58 @@ def test_answer_relevancy():
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Needs</th><th>Why it matters</th><th>Calculated as (plain language)</th></tr></thead>
+          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Needs</th></tr></thead>
           <tbody>
-            <tr><td>Plan&nbsp;Quality</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> (the task, from the golden) · plan read automatically from the trace</td><td>Catches a flawed strategy before execution wastes effort following it</td><td>Reads the task + the plan from the trace; an LLM judge scores how logical and complete the plan is for that task. No plan detected → passes with score 1.</td></tr>
-            <tr><td>Plan&nbsp;Adherence</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> · plan + execution steps, both read automatically from the trace</td><td>A good plan means nothing if the agent drifts from it mid-run</td><td>Reads the task, the plan, and what actually ran; an LLM judge scores how closely execution stuck to the plan.</td></tr>
-            <tr><td>Tool&nbsp;Correctness</td><td>Component-level</td><td>Reference-based</td><td>• <code>input</code> · <code>actual_output</code> · <code>tools_called</code> (captured by tracing) · <code>expected_tools</code></td><td>Catches wrong or missing tool calls, independent of answer quality</td><td>Correct tool calls ÷ total tool calls, exact-match by default (name, args, output, or order — configurable strictness).</td></tr>
-            <tr><td>Argument&nbsp;Correctness</td><td>Component-level</td><td>Referenceless</td><td>• <code>input</code> · <code>actual_output</code> · <code>tools_called</code></td><td>Right tool, wrong arguments still breaks the task</td><td>Correctly generated arguments ÷ total tool calls; an LLM judge checks the arguments against the input context, not a fixed expected value.</td></tr>
-            <tr><td>Task&nbsp;Completion</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> (task — can be given or inferred) · outcome read automatically from the trace</td><td>The top-level pass/fail signal — everything else is diagnostic</td><td>Reads the task (given or inferred) + the final outcome from the trace; an LLM judge scores how fully the outcome satisfies the task.</td></tr>
-            <tr><td>Step&nbsp;Efficiency</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> · every execution step, read automatically from the trace</td><td>A working agent burning 3x the tokens/latency it needs isn't production-ready</td><td>Reads the task + every execution step; an LLM judge scores efficiency, penalizing redundant calls or loops not needed to finish the task.</td></tr>
+            <tr><td>Plan&nbsp;Quality</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> (the task, from the golden) · plan read automatically from the trace</td></tr>
+            <tr><td>Plan&nbsp;Adherence</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> · plan + execution steps, both read automatically from the trace</td></tr>
+            <tr><td>Tool&nbsp;Correctness</td><td>Component-level</td><td>Reference-based</td><td>• <code>input</code> · <code>actual_output</code> · <code>tools_called</code> (captured by tracing) · <code>expected_tools</code></td></tr>
+            <tr><td>Argument&nbsp;Correctness</td><td>Component-level</td><td>Referenceless</td><td>• <code>input</code> · <code>actual_output</code> · <code>tools_called</code></td></tr>
+            <tr><td>Task&nbsp;Completion</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> (task — can be given or inferred) · outcome read automatically from the trace</td></tr>
+            <tr><td>Step&nbsp;Efficiency</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> · every execution step, read automatically from the trace</td></tr>
           </tbody>
         </table>
       </div>
 
       <div class="note">
         <p><strong>Rule of thumb:</strong> trajectory metrics need the whole trace (<code class="inline">evals_iterator(metrics=[...])</code>); component-level metrics attach to one span — the LLM call that picks a tool and its arguments (<code class="inline">@observe(metrics=[...])</code>).</p>
+      </div>
+
+      <h3>What's actually happening under the hood</h3>
+      <p>The table above gives the formula; this is what the judge is actually doing at each step — worth knowing before trusting a score at face value.</p>
+      <p><strong>Task Completion</strong></p>
+      <ul class="plain">
+        <li>Input to extraction step: the full trace (or just question+answer if no trace).</li>
+        <li>What gets extracted: task (what the user asked, one sentence) and outcome (what the system actually did, written out factually).</li>
+        <li>What gets compared: task vs outcome — just these two short texts, nothing else.</li>
+        <li>Output/Score: the model gives a single alignment number (0 to 1) for how well the outcome matches the task. That number is the final score directly.</li>
+      </ul>
+
+      <p><strong>Step Efficiency</strong></p>
+      <ul class="plain">
+        <li>Input to extraction step: the full trace.</li>
+        <li>What gets extracted: only task (just the goal — the outcome is deliberately not extracted here).</li>
+        <li>What gets compared: task vs the entire raw trace (every step the agent took, not a summary of it).</li>
+        <li>Output/Score: the model counts/judges how many steps were taken and whether each was truly necessary for that task, then picks a score from a fixed scale (1.0 = minimal, down to 0.0 = wasteful).</li>
+      </ul>
+
+      <p><strong>Plan Adherence</strong></p>
+      <ul class="plain">
+        <li>Input to extraction step: the full trace.</li>
+        <li>What gets extracted: task and agent_plan (a list of steps — but this is only supposed to exist if the agent literally wrote down a plan somewhere in the trace; otherwise it should come back empty).</li>
+        <li>What gets compared: agent_plan vs the entire raw trace — checking whether every step in the trace matches a step in the plan, and nothing extra happened.</li>
+        <li>Output/Score: the model is told to assume the agent did NOT follow the plan unless the trace proves every single step matches exactly with no extras — so the starting assumption is failure, and it has to be talked out of a low score, not into one.</li>
+      </ul>
+
+      <p><strong>Plan Quality</strong></p>
+      <ul class="plain">
+        <li>Input to extraction step: the full trace (same extraction as Plan Adherence, reused).</li>
+        <li>What gets extracted: the same task and agent_plan.</li>
+        <li>What gets compared: agent_plan vs task only — the trace is not looked at again at this point.</li>
+        <li>Output/Score: the model reads the plan's steps on paper and judges whether they're complete and logically ordered enough to achieve the task, purely as a text-quality check, with no way to verify it against what the agent actually did.</li>
+      </ul>
+
+      <div class="note warn">
+        <p><strong>The catch:</strong> <code class="inline">agent_plan</code> is only meant to exist if the agent explicitly wrote a plan down somewhere in the trace — if it didn't, extraction is supposed to come back empty. In practice, this step can still produce something resembling a plan rather than genuinely returning empty, and both Plan Adherence and Plan Quality then score that reconstructed plan as if it were the agent's real reasoning. If your agent doesn't narrate its plan explicitly, treat both scores as low-confidence until checked manually — or have the agent log its plan outright if these metrics matter to you.</p>
       </div>
     </section>
 
