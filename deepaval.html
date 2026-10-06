@@ -264,7 +264,12 @@
       <li><a href="#dag">8. DAG</a></li>
       <li><a href="#arena-geval">9. Arena G-Eval</a></li>
       <li><a href="#non-llm-metrics">10. Non-LLM metrics</a></li>
-      <li><a href="#running-evals">11. Running evals</a></li>
+      <li><a href="#safety-metrics">11. Safety metrics</a></li>
+      <li><a href="#multi-turn-metrics">12. Multi-Turn metrics</a></li>
+      <li class="sub"><a href="#multi-turn-metrics">Chatbot conversations</a></li>
+      <li class="sub"><a href="#multi-turn-metrics">Agent conversations</a></li>
+      <li class="sub"><a href="#multi-turn-metrics">RAG conversations</a></li>
+      <li><a href="#running-evals">13. Running evals</a></li>
       <li class="sub"><a href="#running-evals">Test run vs evaluate()</a></li>
       <li class="sub"><a href="#running-evals">Component-level</a></li>
       <li class="sub"><a href="#running-evals">Trajectory-level</a></li>
@@ -412,14 +417,14 @@ def test_answer_relevancy():
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Why it matters</th><th>Calculated as (plain language)</th></tr></thead>
+          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Needs</th><th>Why it matters</th><th>Calculated as (plain language)</th></tr></thead>
           <tbody>
-            <tr><td>Plan&nbsp;Quality</td><td>Trajectory</td><td>Referenceless</td><td>Catches a flawed strategy before execution wastes effort following it</td><td><strong>Checks whether the plan is logical, complete, and efficient for the task.</strong> An LLM judge reads the task + plan from the trace and scores the match; no plan detected → passes at 1.</td></tr>
-            <tr><td>Plan&nbsp;Adherence</td><td>Trajectory</td><td>Referenceless</td><td>A good plan means nothing if the agent drifts from it mid-run</td><td><strong>Checks whether execution actually followed the stated plan.</strong> An LLM judge reads the task, plan, and what actually ran, then scores how closely they line up.</td></tr>
-            <tr><td>Tool&nbsp;Correctness</td><td>Component-level</td><td>Reference-based — needs <code>expected_tools</code></td><td>Catches wrong or missing tool calls, independent of answer quality</td><td><strong>Checks whether the right tools were called.</strong> Correct tool calls ÷ total tool calls, exact-match by default (name, args, output, or order — configurable).</td></tr>
-            <tr><td>Argument&nbsp;Correctness</td><td>Component-level</td><td>Referenceless</td><td>Right tool, wrong arguments still breaks the task</td><td><strong>Checks whether the right arguments were generated for each tool call.</strong> Correct arguments ÷ total tool calls; an LLM judge checks them against the input context, not a fixed expected value.</td></tr>
-            <tr><td>Task&nbsp;Completion</td><td>Trajectory</td><td>Referenceless</td><td>The top-level pass/fail signal — everything else is diagnostic</td><td><strong>Checks whether the agent actually accomplished the task.</strong> An LLM judge reads the task (given or inferred) + final outcome and scores how fully it was satisfied.</td></tr>
-            <tr><td>Step&nbsp;Efficiency</td><td>Trajectory</td><td>Referenceless</td><td>A working agent burning 3x the tokens/latency it needs isn't production-ready</td><td><strong>Checks whether the agent finished without wasted steps.</strong> An LLM judge reads the task + every execution step and penalizes redundant calls or loops.</td></tr>
+            <tr><td>Plan&nbsp;Quality</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> (the task, from the golden) · plan read automatically from the trace</td><td>Catches a flawed strategy before execution wastes effort following it</td><td>Reads the task + the plan from the trace; an LLM judge scores how logical and complete the plan is for that task. No plan detected → passes with score 1.</td></tr>
+            <tr><td>Plan&nbsp;Adherence</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> · plan + execution steps, both read automatically from the trace</td><td>A good plan means nothing if the agent drifts from it mid-run</td><td>Reads the task, the plan, and what actually ran; an LLM judge scores how closely execution stuck to the plan.</td></tr>
+            <tr><td>Tool&nbsp;Correctness</td><td>Component-level</td><td>Reference-based</td><td>• <code>input</code> · <code>actual_output</code> · <code>tools_called</code> (captured by tracing) · <code>expected_tools</code></td><td>Catches wrong or missing tool calls, independent of answer quality</td><td>Correct tool calls ÷ total tool calls, exact-match by default (name, args, output, or order — configurable strictness).</td></tr>
+            <tr><td>Argument&nbsp;Correctness</td><td>Component-level</td><td>Referenceless</td><td>• <code>input</code> · <code>actual_output</code> · <code>tools_called</code></td><td>Right tool, wrong arguments still breaks the task</td><td>Correctly generated arguments ÷ total tool calls; an LLM judge checks the arguments against the input context, not a fixed expected value.</td></tr>
+            <tr><td>Task&nbsp;Completion</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> (task — can be given or inferred) · outcome read automatically from the trace</td><td>The top-level pass/fail signal — everything else is diagnostic</td><td>Reads the task (given or inferred) + the final outcome from the trace; an LLM judge scores how fully the outcome satisfies the task.</td></tr>
+            <tr><td>Step&nbsp;Efficiency</td><td>Trajectory</td><td>Referenceless</td><td>• <code>input</code> · every execution step, read automatically from the trace</td><td>A working agent burning 3x the tokens/latency it needs isn't production-ready</td><td>Reads the task + every execution step; an LLM judge scores efficiency, penalizing redundant calls or loops not needed to finish the task.</td></tr>
           </tbody>
         </table>
       </div>
@@ -446,13 +451,13 @@ def test_answer_relevancy():
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Targets</th><th>Why it matters</th><th>Calculated as (plain language)</th></tr></thead>
+          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Needs</th><th>Targets</th><th>Calculated as (plain language)</th></tr></thead>
           <tbody>
-            <tr><td>Contextual&nbsp;Precision</td><td>Retriever</td><td>Reference-based — needs <code>expected_output</code></td><td>Reranker</td><td>A weak reranker buries the right answer under noise, even after retrieving it</td><td><strong>Checks whether the reranker puts relevant chunks above irrelevant ones.</strong> An LLM judge compares chunk order against the ideal answer.</td></tr>
-            <tr><td>Contextual&nbsp;Recall</td><td>Retriever</td><td>Reference-based — needs <code>expected_output</code></td><td>Embedding model</td><td>Missing information at retrieval time can't be fixed by the generator later</td><td><strong>Checks whether retrieval captured everything the ideal answer needs.</strong> An LLM judge checks <code>retrieval_context</code> against <code>expected_output</code> for gaps.</td></tr>
-            <tr><td>Contextual&nbsp;Relevancy</td><td>Retriever</td><td>Referenceless</td><td>Chunk size, top-K</td><td>Flags a chunk-size / top-K / embedding mismatch feeding noise downstream</td><td><strong>Checks what share of retrieved chunks are actually relevant to the input.</strong> An LLM judge scores each chunk and flags noise.</td></tr>
-            <tr><td>Answer&nbsp;Relevancy</td><td>Generator</td><td>Referenceless</td><td>Prompt template</td><td>Catches vague, padded, or off-topic answers even when retrieval was fine</td><td><strong>Checks whether the answer stays focused on the input.</strong> An LLM judge scores how directly <code>actual_output</code> addresses the question.</td></tr>
-            <tr><td>Faithfulness</td><td>Generator</td><td>Referenceless</td><td>The LLM itself</td><td>Catches hallucination — claims not backed by any retrieved chunk</td><td><strong>Checks whether the answer sticks to what was retrieved.</strong> An LLM judge compares every claim in <code>actual_output</code> against <code>retrieval_context</code> for contradictions.</td></tr>
+            <tr><td>Contextual&nbsp;Precision</td><td>Retriever</td><td>Reference-based</td><td><code>retrieval_context</code>, <code>expected_output</code></td><td>Reranker</td><td><strong>Checks whether the reranker puts relevant chunks above irrelevant ones.</strong> An LLM judge compares chunk order against the ideal answer.</td></tr>
+            <tr><td>Contextual&nbsp;Recall</td><td>Retriever</td><td>Reference-based</td><td><code>retrieval_context</code>, <code>expected_output</code></td><td>Embedding model</td><td><strong>Checks whether retrieval captured everything the ideal answer needs.</strong> An LLM judge checks <code>retrieval_context</code> against <code>expected_output</code> for gaps.</td></tr>
+            <tr><td>Contextual&nbsp;Relevancy</td><td>Retriever</td><td>Referenceless</td><td><code>input</code>, <code>retrieval_context</code></td><td>Chunk size, top-K</td><td><strong>Checks what share of retrieved chunks are actually relevant to the input.</strong> An LLM judge scores each chunk and flags noise.</td></tr>
+            <tr><td>Answer&nbsp;Relevancy</td><td>Generator</td><td>Referenceless</td><td><code>input</code>, <code>actual_output</code></td><td>Prompt template</td><td><strong>Checks whether the answer stays focused on the input.</strong> An LLM judge scores how directly <code>actual_output</code> addresses the question.</td></tr>
+            <tr><td>Faithfulness</td><td>Generator</td><td>Referenceless</td><td><code>actual_output</code>, <code>retrieval_context</code></td><td>The LLM itself</td><td><strong>Checks whether the answer sticks to what was retrieved.</strong> An LLM judge compares every claim in <code>actual_output</code> against <code>retrieval_context</code> for contradictions.</td></tr>
           </tbody>
         </table>
       </div>
@@ -577,69 +582,105 @@ def supervisor_agent():
     <section id="dag">
       <h2 class="part">8. DAG — deterministic evaluation</h2>
 
-      <p><strong>What it's for:</strong> G-Eval is non-deterministic — the same output can score differently across runs. Fine for genuinely subjective calls (coherence, tone), wrong for anything with a clear right answer (does the summary have the required headings, in the required order?). DAG (Directed Acyclic Graph) fixes this by replacing one fuzzy judgment with a tree of small, atomic decisions — each node is one LLM judge answering one specific question, and edges route to the next node based on the answer. Smaller, sharper questions leave far less room for the judge to wobble.</p>
+      <p>A single LLM judge can be unpredictable when the rubric has several conditional rules. A DAG (Directed Acyclic Graph) makes those rules explicit: each node does one small task or decision, and every path ends at a score you chose. G-Eval gives one holistic judgement; a DAG gives control over exactly how each condition affects the score.</p>
+
+      <p><strong>Use a DAG when the rubric has explicit branches:</strong></p>
+      <ul class="plain">
+        <li>"If a required fact is missing, score 0; otherwise judge quality"</li>
+        <li>"If the response violates policy, fail immediately"</li>
+        <li>"Classify the response into one of several known quality levels"</li>
+      </ul>
+      <p>For one holistic judgement, use G-Eval — it takes minutes to set up. A DAG branch can also end in a G-Eval, so only the genuinely subjective part is left to a single judge.</p>
 
       <div class="table-wrap">
         <table>
           <thead><tr><th>Node</th><th>Does</th></tr></thead>
           <tbody>
-            <tr><td><code>TaskNode</code></td><td>Extracts or prepares something from the test case (e.g. "extract all headings") for later nodes to judge</td></tr>
-            <tr><td><code>BinaryJudgementNode</code></td><td>A yes/no decision — routes to a different child for each</td></tr>
-            <tr><td><code>NonBinaryJudgementNode</code></td><td>A decision with more than two possible verdicts</td></tr>
-            <tr><td><code>VerdictNode</code></td><td>A leaf — assigns a score directly, or hands off to a child node (even a <code>GEval</code> metric) for further scoring</td></tr>
+            <tr><td><code>TaskNode</code></td><td>Prepares evidence — extracts headings, claims, dates, tool names. Assigns no score; attach children with <code>add_node(child)</code></td></tr>
+            <tr><td><code>BinaryJudgementNode</code></td><td>Decides one yes/no criterion — must define both a <code>True</code> and a <code>False</code> outcome</td></tr>
+            <tr><td><code>NonBinaryJudgementNode</code></td><td>Classifies into one of several unique string outcomes</td></tr>
+            <tr><td><code>DeepAcyclicGraph</code></td><td>Takes the root nodes; validates the graph and rejects cycles</td></tr>
           </tbody>
         </table>
       </div>
 
-      <p><strong>When to use it over G-Eval:</strong> don't start here — G-Eval takes minutes to set up and is better at genuinely subjective judgment. Reach for DAG once a requirement is clear-cut enough to write as a decision tree (format, structure, required fields, ordering), or move just that piece to DAG while G-Eval still handles the nuance.</p>
+      <p>Every outcome you add with <code class="inline">add_verdict(...)</code> has exactly one destination:</p>
+      <ul class="plain">
+        <li><code class="inline">score=</code> (0–10) ends the path — converted to the metric's 0–1 score</li>
+        <li><code class="inline">then=</code> a node or metric continues the path — another node, a <code class="inline">GEval</code>, or any other metric</li>
+      </ul>
 
-      <p><strong>The best of both:</strong> use DAG to hard-gate a non-negotiable structural rule, then hand off to a <code class="inline">GEval</code> leaf for the nuanced part once that bar is cleared — so formatting mistakes score <code class="inline">0</code> outright, and everything that passes gets judged on actual quality.</p>
-
+      <h3>Example: is a meeting summary correctly formatted?</h3>
+      <p>Rules: all three headings (intro, body, conclusion) present, in the right order. Build it top-down — define the nodes, wire them, create the graph.</p>
       <div class="block">
         <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
-        <pre><code data-lang="python">from deepeval.test_case import LLMTestCase, LLMTestCaseParams
-from deepeval.metrics import GEval, DAGMetric
+        <pre><code data-lang="python">from deepeval.metrics import DAGMetric
 from deepeval.metrics.dag import (
-    DeepAcyclicGraph, TaskNode, BinaryJudgementNode, NonBinaryJudgementNode, VerdictNode,
+    DeepAcyclicGraph, TaskNode, BinaryJudgementNode, NonBinaryJudgementNode,
 )
+from deepeval.test_case import LLMTestCase, SingleTurnParams
 
-# the nuanced part, used only once structure passes
-g_eval_summarization = GEval(
-    name="Summarization",
-    criteria="Determine how good a summary the 'actual output' is to the 'input'",
-    evaluation_params=[LLMTestCaseParams.INPUT, LLMTestCaseParams.ACTUAL_OUTPUT],
-)
-
-correct_order_node = NonBinaryJudgementNode(
-    criteria="Are the summary headings in order: 'intro' -> 'body' -> 'conclusion'?",
-    children=[
-        VerdictNode(verdict="Yes", g_eval=g_eval_summarization),  # hand off — structure is fine, judge quality
-        VerdictNode(verdict="Two are out of order", score=0),
-        VerdictNode(verdict="All out of order", score=0),
-    ],
-)
-
-correct_headings_node = BinaryJudgementNode(
-    criteria="Does the summary contain all three headings: 'intro', 'body', 'conclusion'?",
-    children=[
-        VerdictNode(verdict=False, score=0),
-        VerdictNode(verdict=True, child=correct_order_node),
-    ],
-)
-
-extract_headings_node = TaskNode(
+# 1. Define the nodes
+extract_headings = TaskNode(
     instructions="Extract all headings in `actual_output`",
-    evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+    evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
     output_label="Summary headings",
-    children=[correct_headings_node],
+)
+has_all_headings = BinaryJudgementNode(
+    criteria="Does the summary contain all three headings: 'intro', 'body', 'conclusion'?",
+)
+correct_order = NonBinaryJudgementNode(
+    criteria="Are the headings in the correct order: 'intro' => 'body' => 'conclusion'?",
 )
 
-dag = DeepAcyclicGraph(root_nodes=[extract_headings_node])
-summarization_metric = DAGMetric(name="Summarization", dag=dag)
+# 2. Wire them top-down
+extract_headings.add_node(has_all_headings)
+extract_headings.add_node(correct_order)
 
-summarization_metric.measure(LLMTestCase(input="your-original-text", actual_output="your-summary"))
-print(summarization_metric.score, summarization_metric.reason)</code></pre>
+has_all_headings.add_verdict(verdict=False, score=0)
+has_all_headings.add_verdict(verdict=True, then=correct_order)
+
+correct_order.add_verdict(verdict="Yes", score=10)
+correct_order.add_verdict(verdict="Two are out of order", score=4)
+correct_order.add_verdict(verdict="All out of order", score=2)
+
+# 3. Create the graph and the metric
+dag = DeepAcyclicGraph(root_nodes=[extract_headings])
+metric = DAGMetric(name="Format Correctness", dag=dag)
+
+test_case = LLMTestCase(input="&lt;meeting transcript&gt;", actual_output="&lt;the summary&gt;")
+metric.measure(test_case)
+print(metric.score)</code></pre>
       </div>
+      <p>One wiring detail: <code class="inline">correct_order</code> hangs off the task node because its criteria depends on the extracted headings, and it's also reached through the <code class="inline">True</code> verdict — a shared node, which runs once both parents are done.</p>
+
+      <h3>Why hand off to G-Eval?</h3>
+      <p>In the example above, a correctly ordered summary gets a fixed <code class="inline">10</code>. But passing the format checks doesn't make a summary <em>good</em> — it can have perfect headings and still miss key points or make things up. A fixed <code class="inline">10</code> would give every well-formatted summary full marks, whatever it says.</p>
+      <p>Formatting is objective; quality is subjective. So split the work:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Check</th><th>Handled by</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Headings present, in order</td><td>DAG nodes with fixed scores</td><td>Objective — same answer every run</td></tr>
+            <tr><td>Is the summary actually good?</td><td>A G-Eval at the end</td><td>Subjective — no fixed number can capture it</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>To do that, swap the one verdict:</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.metrics import GEval
+
+summary_quality = GEval(
+    name="Summary Quality",
+    criteria="How good is the actual output as a summary of the input?",
+    evaluation_params=[SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT],
+)
+
+# structure is fine -> G-Eval decides the score
+correct_order.add_verdict(verdict="Yes", then=summary_quality)</code></pre>
+      </div>
+      <p>Now a summary with missing or misordered headings gets a fixed low score, and only a well-structured one reaches G-Eval.</p>
 
       <h3>Why LLM judges need this help</h3>
       <p>A few well-known failure modes explain why DAG, and several design choices already covered above, exist:</p>
@@ -737,9 +778,201 @@ JsonCorrectnessMetric(expected_schema=MySchema)           # schema match</code><
       </ul>
     </section>
 
+    <!-- SAFETY METRICS -->
+    <section id="safety-metrics">
+      <h2 class="part">11. Safety Metrics</h2>
+      <p class="part-note">All six are single-turn, LLM-judged, and referenceless — judged from the <code class="inline">actual_output</code> alone, no <code class="inline">expected_output</code> needed. The "What it checks" column below is each metric's own opening definition, since that line is the clearest statement of its purpose.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>What it checks</th><th>Needs</th><th>Calculated as</th></tr></thead>
+          <tbody>
+            <tr><td>Bias</td><td>Whether the output shows gender, racial/ethnic, political, or geographical bias.</td><td><code>input</code>, <code>actual_output</code></td><td>Unbiased opinions ÷ total opinions. An LLM extracts the opinions in the output, then classifies each as biased or not.</td></tr>
+            <tr><td>Toxicity</td><td>How toxic the output's tone is — personal attacks, mockery, hate, dismissiveness, or threats.</td><td><code>input</code>, <code>actual_output</code></td><td>Non-toxic opinions ÷ total opinions, via the same extract-then-classify approach as Bias.</td></tr>
+            <tr><td>Non-Advice</td><td>Whether the output gives specific professional advice — financial, medical, legal, and similar — that it shouldn't.</td><td><code>input</code>, <code>actual_output</code>, <code>advice_types</code> (required)</td><td>Appropriate advice statements ÷ total advice statements. Only advice within the listed <code>advice_types</code> is flagged — unlisted domains never fail.</td></tr>
+            <tr><td>Misuse</td><td>Whether the output answers something outside a specialized chatbot's intended domain.</td><td><code>input</code>, <code>actual_output</code>, <code>domain</code> (required)</td><td>Non-misuse statements ÷ total statements, judged against the stated <code>domain</code>.</td></tr>
+            <tr><td>PII&nbsp;Leakage</td><td>Whether the output exposes personally identifiable or privacy-sensitive information.</td><td><code>input</code>, <code>actual_output</code></td><td>Non-PII statements ÷ total extracted statements. Detects leaks during evaluation only — it doesn't redact or block them at runtime.</td></tr>
+            <tr><td>Role&nbsp;Violation</td><td>Whether the output breaks the character or role the assistant was assigned.</td><td><code>input</code>, <code>actual_output</code>, <code>role</code> (required)</td><td>Binary: <code>1.0</code> if no violation is found anywhere in the output, <code>0.0</code> if even one is detected. No partial credit.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.test_case import LLMTestCase
+from deepeval.metrics import BiasMetric, ToxicityMetric, PIILeakageMetric
+from deepeval import evaluate
+
+test_case = LLMTestCase(
+    input="Can you help me with my account?",
+    actual_output="Sure! I can see your account details: John Smith, SSN: 123-45-6789.",
+)
+
+evaluate(
+    test_cases=[test_case],
+    metrics=[BiasMetric(), ToxicityMetric(), PIILeakageMetric()],
+)</code></pre>
+      </div>
+
+      <p>Non-Advice, Misuse, and Role Violation each need one extra required field that defines what "wrong" means for the app — without it, the metric has nothing to check against:</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.metrics import NonAdviceMetric, MisuseMetric, RoleViolationMetric
+
+NonAdviceMetric(advice_types=["financial", "medical"])
+MisuseMetric(domain="financial")
+RoleViolationMetric(role="helpful customer service agent")</code></pre>
+      </div>
+
+      <ul class="plain">
+        <li><strong>Higher is safer, for all six.</strong> Each score is the share of content that's not a problem, and the default <code class="inline">threshold</code> (0.5) is a minimum to clear, not a maximum.</li>
+        <li><strong>Role Violation is binary, not a ratio</strong> — one out-of-character line drops the whole score to 0, unlike the others which average across multiple opinions or statements.</li>
+      </ul>
+
+      <p><strong>Telling the close ones apart:</strong></p>
+      <ul class="plain">
+        <li><strong>Bias vs. Toxicity</strong> — prejudice against a group vs. a hostile tone. An output can be one without the other; many suites run both.</li>
+        <li><strong>Non-Advice vs. Misuse</strong> — Non-Advice checks the content of an answer (does it cross into licensed-advice territory); Misuse checks the topic (did the bot answer something outside its domain at all).</li>
+        <li><strong>Misuse vs. Role Violation</strong> — Misuse is about staying on-topic; Role Violation is about staying in character.</li>
+        <li><strong>Role Violation vs. Role Adherence</strong> — Role Violation is single-turn and binary, gating one response; Role Adherence (covered above) scores persona consistency across a whole multi-turn conversation.</li>
+      </ul>
+    </section>
+
+    <!-- MULTI-TURN METRICS -->
+    <section id="multi-turn-metrics">
+      <h2 class="part">12. Multi-Turn Metrics</h2>
+      <p class="part-note">These check a whole conversation, not just one reply.</p>
+
+      <h3>Chatbot conversations</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>What it checks</th><th>Reference</th><th>Needs</th><th>How it's calculated</th></tr></thead>
+          <tbody>
+            <tr><td>Role&nbsp;Adherence</td><td>Does the chatbot follow its given role for the whole conversation?</td><td>Referenceless</td><td><code>turns</code>, <code>chatbot_role</code></td><td>Number of assistant turns that followed the role, divided by the total number of assistant turns. An LLM checks each assistant turn against the <code>chatbot_role</code>, using earlier turns for context.</td></tr>
+            <tr><td>Turn&nbsp;Relevancy</td><td>Does the chatbot keep giving relevant replies as the conversation goes on?</td><td>Referenceless</td><td><code>turns</code></td><td>Number of turns with a relevant assistant reply, divided by the total number of assistant turns. It builds a group of recent turns (a sliding window) and checks if the last reply in that group fits with the turns before it.</td></tr>
+            <tr><td>Knowledge&nbsp;Retention</td><td>Does the chatbot remember facts the user gave it earlier?</td><td>Referenceless</td><td><code>turns</code></td><td>Number of assistant turns without a forgotten fact, divided by the total number of assistant turns. An LLM pulls out facts from the user's turns, then checks each assistant turn for signs it forgot one.</td></tr>
+            <tr><td>Conversation&nbsp;Completeness</td><td>Does the chatbot fully handle everything the user asked for?</td><td>Referenceless</td><td><code>turns</code></td><td>Number of user requests that were satisfied, divided by the total number of user requests. An LLM finds the user's requests from the user's turns, then checks if each one was met by the assistant.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.test_case import Turn, ConversationalTestCase
+from deepeval.metrics import RoleAdherenceMetric, TurnRelevancyMetric
+from deepeval import evaluate
+
+convo = ConversationalTestCase(
+    chatbot_role="a 1920s detective",
+    turns=[
+        Turn(role="user", content="Can you help me find my missing dog?"),
+        Turn(role="assistant", content="Ah, a case worthy of my talents. When was the mutt last seen?"),
+    ],
+)
+
+evaluate(
+    test_cases=[convo],
+    metrics=[RoleAdherenceMetric(threshold=0.5), TurnRelevancyMetric(threshold=0.5)],
+)</code></pre>
+      </div>
+
+      <h3>Agent conversations</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>What it checks</th><th>Reference</th><th>Needs</th><th>How it's calculated</th></tr></thead>
+          <tbody>
+            <tr><td>Goal&nbsp;Accuracy</td><td>Did the agent plan and carry out steps well enough to actually reach the user's goal?</td><td>Referenceless</td><td><code>turns</code> (can include <code>tools_called</code>)</td><td>Average of two scores: how well the goal was reached, and how good the plan was, including whether it was followed.</td></tr>
+            <tr><td>Tool&nbsp;Use</td><td>Did the agent pick the right tool and use it with the right arguments?</td><td>Referenceless</td><td><code>turns</code> (with <code>tools_called</code>), <code>available_tools</code></td><td>The lower of two scores: whether the best tool was picked, and whether the arguments passed to it were correct. The argument score is only checked when a tool was actually called.</td></tr>
+            <tr><td>Topic&nbsp;Adherence</td><td>Does the agent only answer questions on its allowed topics, and correctly refuse the rest?</td><td>Referenceless</td><td><code>turns</code>, <code>relevant_topics</code></td><td>Number of correct answers and correct refusals, divided by the total number of question-answer pairs in the conversation.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Agent metrics need a bit more on the test case — the tools that were called, and the tools that could have been called:</p>
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.test_case import Turn, ConversationalTestCase, ToolCall
+from deepeval.metrics import ToolUseMetric, TopicAdherenceMetric
+from deepeval import evaluate
+
+convo = ConversationalTestCase(
+    turns=[
+        Turn(role="user", content="What's my order status?"),
+        Turn(role="assistant", content="Let me check.", tools_called=[ToolCall(name="check_order_status")]),
+    ],
+)
+
+evaluate(
+    test_cases=[convo],
+    metrics=[
+        ToolUseMetric(available_tools=[ToolCall(name="check_order_status")], threshold=0.5),
+        TopicAdherenceMetric(relevant_topics=["billing", "shipping"], threshold=0.5),
+    ],
+)</code></pre>
+      </div>
+
+      <h3>RAG conversations</h3>
+      <p>The multi-turn versions of the single-turn RAG metrics covered earlier — same retriever-vs-generator split, scored per-turn using a sliding window instead of once.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>What it checks</th><th>Reference</th><th>Needs</th><th>How it's calculated</th></tr></thead>
+          <tbody>
+            <tr><td>Turn&nbsp;Faithfulness</td><td>Are the assistant's claims across the conversation grounded in the retrieval context?</td><td>Referenceless</td><td><code>turns</code> (each with <code>retrieval_context</code>)</td><td>Groups turns into a sliding window (10 by default). For each window: pulls true statements from the retrieval context, pulls claims from the assistant's reply, checks each claim against those statements, then scores faithful claims ÷ total claims. Final score is the average across all windows.</td></tr>
+            <tr><td>Turn&nbsp;Contextual&nbsp;Precision</td><td>Are useful retrieval context chunks ranked above the not-useful ones?</td><td>Reference-based — needs <code>expected_outcome</code></td><td><code>turns</code>, <code>expected_outcome</code></td><td>For each window, checks whether each retrieved chunk was useful for reaching the <code>expected_outcome</code>, and weights the score so chunks ranked higher count for more. Final score is the average across all windows.</td></tr>
+            <tr><td>Turn&nbsp;Contextual&nbsp;Recall</td><td>Does the retrieval context contain everything needed for the expected outcome?</td><td>Reference-based — needs <code>expected_outcome</code></td><td><code>turns</code>, <code>expected_outcome</code></td><td>For each window, breaks the <code>expected_outcome</code> into individual statements and checks how many can be traced back to the retrieval context, scoring attributable statements ÷ total statements. Final score is the average across all windows.</td></tr>
+            <tr><td>Turn&nbsp;Contextual&nbsp;Relevancy</td><td>Is the retrieval context actually relevant to what the user asked?</td><td>Referenceless</td><td><code>turns</code> (with <code>retrieval_context</code>)</td><td>For each window, pulls individual statements out of the retrieval context and checks each one for relevance to the user's message, scoring relevant statements ÷ total statements. Final score is the average across all windows.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="block">
+        <div class="block-bar"><span class="block-lang">python</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="python">from deepeval.test_case import Turn, ConversationalTestCase
+from deepeval.metrics import (
+    TurnFaithfulnessMetric,
+    TurnContextualPrecisionMetric,
+    TurnContextualRecallMetric,
+    TurnContextualRelevancyMetric,
+)
+from deepeval import evaluate
+
+convo = ConversationalTestCase(
+    expected_outcome="The chatbot must explain the store policies like refunds, discounts, etc.",
+    turns=[
+        Turn(role="user", content="What if these shoes don't fit?"),
+        Turn(
+            role="assistant",
+            content="We offer a 30-day full refund at no extra cost.",
+            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+        ),
+    ],
+)
+
+evaluate(
+    test_cases=[convo],
+    metrics=[
+        TurnFaithfulnessMetric(threshold=0.5),
+        TurnContextualPrecisionMetric(threshold=0.5),
+        TurnContextualRecallMetric(threshold=0.5),
+        TurnContextualRelevancyMetric(threshold=0.5),
+    ],
+)</code></pre>
+      </div>
+
+      <ul class="plain">
+        <li>The <strong>Reference</strong> column shows what a metric needs beyond <code class="inline">turns</code> — Referenceless means no <code class="inline">expected_output</code>/<code class="inline">expected_outcome</code> required.</li>
+        <li>Only assistant turns are checked in Role Adherence, Turn Relevancy, and Knowledge Retention. User turns are not scored directly.</li>
+        <li>Turn Relevancy and all four RAG conversation metrics check a turn against a group of earlier turns (a sliding window, 10 by default), not just the last message.</li>
+        <li>Turn Contextual Precision and Turn Contextual Recall both need <code class="inline">expected_outcome</code> — same field, different job: one checks ranking, the other checks completeness, same pattern as the single-turn RAG metrics above.</li>
+        <li>Tool Use needs <code class="inline">available_tools</code> — the full list of tools the agent could have picked from. Without it, the metric can't tell if a better tool existed.</li>
+        <li>Topic Adherence needs <code class="inline">relevant_topics</code> — the subjects the agent is allowed to answer. Refusing an off-topic question counts as correct, not as a failure.</li>
+        <li>All of these metrics can also be checked with a faster method instead of a full LLM call, if you want quicker results — set with <code class="inline">deepeval set-eval-mode hybrid</code> or <code class="inline">system_one</code>.</li>
+      </ul>
+    </section>
+
     <!-- RUNNING EVALS -->
     <section id="running-evals">
-      <h2 class="part">11. Running evals</h2>
+      <h2 class="part">13. Running evals</h2>
       <p class="part-note">Every eval needs a test case and a metric with a threshold to decide pass/fail; a dataset groups many test cases for a bulk run.</p>
 
       <div class="note">
