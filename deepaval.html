@@ -256,21 +256,21 @@
       <li class="sub"><a href="#getting-started">By coding agent</a></li>
       <li><a href="#building-blocks">3. Core building blocks</a></li>
       <li><a href="#eval-modes">4. Three eval modes</a></li>
-      <li><a href="#agent-metrics">5. Agent metrics</a></li>
-      <li class="sub"><a href="#agent-metrics">What's happening under the hood</a></li>
-      <li><a href="#rag-metrics">6. RAG metrics</a></li>
+      <li><a href="#rag-metrics">5. RAG metrics</a></li>
       <li class="sub"><a href="#rag-metrics">The RAG Triad</a></li>
-      <li class="sub"><a href="#rag-metrics">Building the golden dataset</a></li>
-      <li><a href="#g-eval">7. G-Eval</a></li>
-      <li><a href="#dag">8. DAG</a></li>
-      <li><a href="#arena-geval">9. Arena G-Eval</a></li>
-      <li><a href="#non-llm-metrics">10. Non-LLM metrics</a></li>
-      <li><a href="#safety-metrics">11. Safety metrics</a></li>
-      <li><a href="#multi-turn-metrics">12. Multi-Turn metrics</a></li>
+      <li><a href="#agent-metrics">6. Agent metrics</a></li>
+      <li class="sub"><a href="#agent-metrics">What's happening under the hood</a></li>
+      <li><a href="#golden-dataset">7. Building the Golden Dataset</a></li>
+      <li><a href="#g-eval">8. G-Eval</a></li>
+      <li><a href="#dag">9. DAG</a></li>
+      <li><a href="#arena-geval">10. Arena G-Eval</a></li>
+      <li><a href="#non-llm-metrics">11. Non-LLM metrics</a></li>
+      <li><a href="#safety-metrics">12. Safety metrics</a></li>
+      <li><a href="#multi-turn-metrics">13. Multi-Turn metrics</a></li>
       <li class="sub"><a href="#multi-turn-metrics">Chatbot conversations</a></li>
       <li class="sub"><a href="#multi-turn-metrics">Agent conversations</a></li>
       <li class="sub"><a href="#multi-turn-metrics">RAG conversations</a></li>
-      <li><a href="#running-evals">13. Running evals</a></li>
+      <li><a href="#running-evals">14. Running evals</a></li>
       <li class="sub"><a href="#running-evals">Test run vs evaluate()</a></li>
       <li class="sub"><a href="#running-evals">Component-level</a></li>
       <li class="sub"><a href="#running-evals">Trajectory-level</a></li>
@@ -400,9 +400,46 @@ def test_answer_relevancy():
       </div>
     </section>
 
+    <!-- RAG METRICS -->
+    <section id="rag-metrics">
+      <h2 class="part">5. RAG metrics</h2>
+      <p class="part-note">Five metrics split across the two halves of a RAG pipeline — the retriever fetches chunks, the generator turns them into an answer — each targeting a specific hyperparameter.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Handles</th><th>Metrics</th></tr></thead>
+          <tbody>
+            <tr><td>Retriever</td><td>Fetches text chunks from the knowledge base</td><td>Contextual Precision, Contextual Recall, Contextual Relevancy</td></tr>
+            <tr><td>Generator</td><td>Turns retrieved chunks + query into an answer</td><td>Answer Relevancy, Faithfulness</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Needs</th><th>Targets</th><th>Calculated as (plain language)</th></tr></thead>
+          <tbody>
+            <tr><td>Contextual&nbsp;Precision</td><td>Retriever</td><td>Reference-based</td><td><code>retrieval_context</code>, <code>expected_output</code></td><td>Reranker</td><td><strong>Checks whether the reranker puts relevant chunks above irrelevant ones.</strong> An LLM judge compares chunk order against the ideal answer.</td></tr>
+            <tr><td>Contextual&nbsp;Recall</td><td>Retriever</td><td>Reference-based</td><td><code>retrieval_context</code>, <code>expected_output</code></td><td>Embedding model</td><td><strong>Checks whether retrieval captured everything the ideal answer needs.</strong> An LLM judge checks <code>retrieval_context</code> against <code>expected_output</code> for gaps.</td></tr>
+            <tr><td>Contextual&nbsp;Relevancy</td><td>Retriever</td><td>Referenceless</td><td><code>input</code>, <code>retrieval_context</code></td><td>Chunk size, top-K</td><td><strong>Checks what share of retrieved chunks are actually relevant to the input.</strong> An LLM judge scores each chunk and flags noise.</td></tr>
+            <tr><td>Answer&nbsp;Relevancy</td><td>Generator</td><td>Referenceless</td><td><code>input</code>, <code>actual_output</code></td><td>Prompt template</td><td><strong>Checks whether the answer stays focused on the input.</strong> An LLM judge scores how directly <code>actual_output</code> addresses the question.</td></tr>
+            <tr><td>Faithfulness</td><td>Generator</td><td>Referenceless</td><td><code>actual_output</code>, <code>retrieval_context</code></td><td>The LLM itself</td><td><strong>Checks whether the answer sticks to what was retrieved.</strong> An LLM judge compares every claim in <code>actual_output</code> against <code>retrieval_context</code> for contradictions.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <p><strong>Same field, different job:</strong> Contextual Precision and Contextual Recall both read <code class="inline">expected_output</code>, but one checks ranking, the other checks completeness.</p>
+      </div>
+
+      <h3>The RAG Triad</h3>
+      <p>Answer Relevancy + Faithfulness + Contextual Relevancy are all referenceless — no <code class="inline">expected_output</code> needed. High scores across all three is a solid signal the pipeline's hyperparameters are dialed in, without any labeled data. Add Contextual Precision and Recall on top only when labeled outputs are available, for stricter retrieval checks.</p>
+
+    </section>
+
     <!-- AGENT METRICS -->
     <section id="agent-metrics">
-      <h2 class="part">5. Agent metrics</h2>
+      <h2 class="part">6. Agent metrics</h2>
       <p class="part-note">Six metrics purpose-built for agents, spanning three layers of the agent loop.</p>
 
       <div class="table-wrap">
@@ -473,42 +510,9 @@ def test_answer_relevancy():
       </div>
     </section>
 
-    <!-- RAG METRICS -->
-    <section id="rag-metrics">
-      <h2 class="part">6. RAG metrics</h2>
-      <p class="part-note">Five metrics split across the two halves of a RAG pipeline — the retriever fetches chunks, the generator turns them into an answer — each targeting a specific hyperparameter.</p>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Component</th><th>Handles</th><th>Metrics</th></tr></thead>
-          <tbody>
-            <tr><td>Retriever</td><td>Fetches text chunks from the knowledge base</td><td>Contextual Precision, Contextual Recall, Contextual Relevancy</td></tr>
-            <tr><td>Generator</td><td>Turns retrieved chunks + query into an answer</td><td>Answer Relevancy, Faithfulness</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Metric</th><th>Scope</th><th>Reference</th><th>Needs</th><th>Targets</th><th>Calculated as (plain language)</th></tr></thead>
-          <tbody>
-            <tr><td>Contextual&nbsp;Precision</td><td>Retriever</td><td>Reference-based</td><td><code>retrieval_context</code>, <code>expected_output</code></td><td>Reranker</td><td><strong>Checks whether the reranker puts relevant chunks above irrelevant ones.</strong> An LLM judge compares chunk order against the ideal answer.</td></tr>
-            <tr><td>Contextual&nbsp;Recall</td><td>Retriever</td><td>Reference-based</td><td><code>retrieval_context</code>, <code>expected_output</code></td><td>Embedding model</td><td><strong>Checks whether retrieval captured everything the ideal answer needs.</strong> An LLM judge checks <code>retrieval_context</code> against <code>expected_output</code> for gaps.</td></tr>
-            <tr><td>Contextual&nbsp;Relevancy</td><td>Retriever</td><td>Referenceless</td><td><code>input</code>, <code>retrieval_context</code></td><td>Chunk size, top-K</td><td><strong>Checks what share of retrieved chunks are actually relevant to the input.</strong> An LLM judge scores each chunk and flags noise.</td></tr>
-            <tr><td>Answer&nbsp;Relevancy</td><td>Generator</td><td>Referenceless</td><td><code>input</code>, <code>actual_output</code></td><td>Prompt template</td><td><strong>Checks whether the answer stays focused on the input.</strong> An LLM judge scores how directly <code>actual_output</code> addresses the question.</td></tr>
-            <tr><td>Faithfulness</td><td>Generator</td><td>Referenceless</td><td><code>actual_output</code>, <code>retrieval_context</code></td><td>The LLM itself</td><td><strong>Checks whether the answer sticks to what was retrieved.</strong> An LLM judge compares every claim in <code>actual_output</code> against <code>retrieval_context</code> for contradictions.</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="note">
-        <p><strong>Same field, different job:</strong> Contextual Precision and Contextual Recall both read <code class="inline">expected_output</code>, but one checks ranking, the other checks completeness.</p>
-      </div>
-
-      <h3>The RAG Triad</h3>
-      <p>Answer Relevancy + Faithfulness + Contextual Relevancy are all referenceless — no <code class="inline">expected_output</code> needed. High scores across all three is a solid signal the pipeline's hyperparameters are dialed in, without any labeled data. Add Contextual Precision and Recall on top only when labeled outputs are available, for stricter retrieval checks.</p>
-
-      <h3>Building the golden dataset</h3>
+    <!-- BUILDING THE GOLDEN DATASET -->
+    <section id="golden-dataset">
+      <h2 class="part">7. Building the Golden Dataset</h2>
       <p>A golden is a lightweight template — just an <code class="inline">input</code> and an <code class="inline">expected_output</code>, not a full test case yet (no <code class="inline">retrieval_context</code> or <code class="inline">actual_output</code>; those get filled in live, at evaluation time, by actually calling the retriever and generator). Four ways to build the set, roughly in order of how much they scale:</p>
 
       <div class="table-wrap">
@@ -535,12 +539,61 @@ goldens = synthesizer.generate_goldens_from_docs(
 dataset = EvaluationDataset(goldens=goldens)</code></pre>
       </div>
 
+      <p>The <code class="inline">Synthesizer</code> has four generation methods, each grounded differently:</p>
+      <p><strong><code>generate_goldens_from_docs</code></strong></p>
+      <ul class="plain">
+        <li>Requires: <code class="inline">document_paths</code> — supported types <code class="inline">.txt</code>, <code class="inline">.docx</code>, <code class="inline">.pdf</code>, <code class="inline">.md</code>, <code class="inline">.markdown</code>, <code class="inline">.mdx</code>.</li>
+        <li>Grounded in your actual documents — DeepEval parses, chunks, and groups context from them automatically (full mechanism below).</li>
+        <li>When to use: you have the real documents that make up your knowledge base and want DeepEval to handle context-building for you.</li>
+      </ul>
+
+      <p><strong><code>generate_goldens_from_contexts</code></strong></p>
+      <ul class="plain">
+        <li>Requires: <code class="inline">contexts</code> — a list of contexts, each itself a list of strings, ideally sharing a common theme. Optional <code class="inline">source_files</code> (same length as <code class="inline">contexts</code>) to label where each one came from.</li>
+        <li>Skips context construction entirely — uses what you hand it directly. (<code class="inline">generate_goldens_from_docs</code> actually calls this method under the hood, after building the contexts for you.)</li>
+        <li>When to use: you already have an embedded knowledge base, or have already chunked your documents yourself, and want to control chunking rather than let DeepEval parse raw files.</li>
+      </ul>
+
+      <p><strong><code>generate_goldens_from_goldens</code></strong></p>
+      <ul class="plain">
+        <li>Requires: <code class="inline">goldens</code> — an existing set to expand from. Single-turn goldens only produce more single-turn goldens, same for multi-turn — no mixing.</li>
+        <li>If those goldens carry <code class="inline">context</code>, new ones are grounded in it and get an <code class="inline">expected_output</code>; without <code class="inline">context</code>, it falls back to scratch-style generation from the existing <code class="inline">input</code>s, and no <code class="inline">expected_output</code> is produced.</li>
+        <li>When to use: you already have a seed set and want to expand or add complexity to it quickly, without touching documents or contexts again.</li>
+      </ul>
+
+      <p><strong><code>generate_goldens_from_scratch</code></strong></p>
+      <ul class="plain">
+        <li>Requires: just <code class="inline">num_goldens</code> — no documents, no contexts. You do need to supply a <code class="inline">StylingConfig</code> (or <code class="inline">ConversationalStylingConfig</code> for multi-turn) up front — <code class="inline">task</code>, <code class="inline">scenario</code>, output format — since there's no grounding data to infer it from.</li>
+        <li>The least grounded of the four; nothing is checked against a real source, so <code class="inline">expected_output</code> is never generated.</li>
+        <li>When to use: your chatbot doesn't rely on RAG at all, so there's no knowledge base to generate from — or you want to test queries that go beyond what your existing knowledge base covers.</li>
+      </ul>
+
+      <h3>How <code>generate_goldens_from_docs</code> actually builds context</h3>
+      <p><strong>Requires:</strong> <code class="inline">document_paths</code> — a list of file paths. Supported types: <code class="inline">.txt</code>, <code class="inline">.docx</code>, <code class="inline">.pdf</code>, <code class="inline">.md</code>, <code class="inline">.markdown</code>, <code class="inline">.mdx</code>.</p>
+      <ul class="plain">
+        <li>Loads each document in <code class="inline">document_paths</code> using a LangChain document loader (reads the raw text).</li>
+        <li>Chunks the document into pieces using <code class="inline">chunk_size</code>/<code class="inline">chunk_overlap</code> (defaults 1024/0), storing each chunk as an entry in a temporary ChromaDB collection, one collection per source file.</li>
+        <li>Picks <code class="inline">k</code> random seed chunks from that file's chunks, where <code class="inline">k</code> = <code class="inline">max_contexts_per_document</code> (a config value you set — e.g. <code class="inline">k=1</code> means 1 seed chunk per file, <code class="inline">k=3</code> means 3).</li>
+        <li>For each seed chunk, independently:
+          <ul class="plain">
+            <li>Embeds the seed chunk's text.</li>
+            <li>Runs a similarity search against all chunks of that same document (not across other files), asking for the top <code class="inline">max_context_length</code> (default 3) most similar chunks.</li>
+            <li>Drops the first result — it's always the seed chunk matching itself.</li>
+            <li>Keeps up to <code class="inline">max_context_length - 1</code> remaining chunks (default 2), but only ones whose similarity score clears <code class="inline">context_similarity_threshold</code> (default 0.0, so almost anything qualifies).</li>
+            <li>Combines the seed chunk + its similar chunks into one text blob — that combined blob is "a context." The similar chunks are picked by meaning, not by position in the document, so a context can pull together chunk #2 and chunk #8 even if they're far apart in the original file.</li>
+          </ul>
+        </li>
+        <li>End result: <code class="inline">k</code> contexts per document, each a different combination of 1–3 chunks grouped by semantic similarity rather than reading order.</li>
+        <li>(Next step, not part of context-building itself): each context then gets <code class="inline">max_goldens_per_context</code> (default 2) synthetic question/answer pairs generated from it.</li>
+      </ul>
+
       <p>On production feedback: a 👎 on a real response flags a genuine failure mode worth turning into a regression golden — the exact case that broke, kept so it never quietly breaks again. A 👍 is worth keeping too, as a known-good baseline to make sure future changes don't regress it. Either way, the golden set stays grounded in what users actually ask, not what the team assumes they'll ask.</p>
+
     </section>
 
     <!-- G-EVAL -->
     <section id="g-eval">
-      <h2 class="part">7. G-Eval — custom criteria in plain English</h2>
+      <h2 class="part">8. G-Eval — custom criteria in plain English</h2>
 
       <p><strong>What it's for:</strong> every other metric here checks one fixed thing — relevancy, faithfulness, tool calls. G-Eval lets you define your own criteria in a sentence or two — tone, safety, completeness, whatever the app actually needs — without writing a custom scorer from scratch. It's the metric Arena G-Eval below is itself adapted from.</p>
 
@@ -619,7 +672,7 @@ def supervisor_agent():
 
     <!-- DAG -->
     <section id="dag">
-      <h2 class="part">8. DAG — deterministic evaluation</h2>
+      <h2 class="part">9. DAG — deterministic evaluation</h2>
 
       <p>A single LLM judge can be unpredictable when the rubric has several conditional rules. A DAG (Directed Acyclic Graph) makes those rules explicit: each node does one small task or decision, and every path ends at a score you chose. G-Eval gives one holistic judgement; a DAG gives control over exactly how each condition affects the score.</p>
 
@@ -739,7 +792,7 @@ correct_order.add_verdict(verdict="Yes", then=summary_quality)</code></pre>
 
     <!-- ARENA G-EVAL -->
     <section id="arena-geval">
-      <h2 class="part">9. Arena G-Eval — picking a winner</h2>
+      <h2 class="part">10. Arena G-Eval — picking a winner</h2>
 
       <p><strong>What it's for:</strong> every metric so far scores one output against a bar — a threshold decides pass or fail. Arena G-Eval answers a different question entirely: not "is this good enough" but "which of these is better." Hand it two or more "contestants" — different prompts, models, or configs run on the same input — and it names a winner instead of a score.</p>
 
@@ -787,7 +840,7 @@ compare(test_cases=[a_test_case], metric=metric)</code></pre>
 
     <!-- NON-LLM METRICS -->
     <section id="non-llm-metrics">
-      <h2 class="part">10. Non-LLM metrics</h2>
+      <h2 class="part">11. Non-LLM metrics</h2>
       <p class="part-note">No LLM judge, no token cost, fully deterministic — same input always gives the same score. These check structure and exact matches, not meaning.</p>
 
       <div class="table-wrap">
@@ -819,7 +872,7 @@ JsonCorrectnessMetric(expected_schema=MySchema)           # schema match</code><
 
     <!-- SAFETY METRICS -->
     <section id="safety-metrics">
-      <h2 class="part">11. Safety Metrics</h2>
+      <h2 class="part">12. Safety Metrics</h2>
       <p class="part-note">All six are single-turn, LLM-judged, and referenceless — judged from the <code class="inline">actual_output</code> alone, no <code class="inline">expected_output</code> needed. The "What it checks" column below is each metric's own opening definition, since that line is the clearest statement of its purpose.</p>
 
       <div class="table-wrap">
@@ -879,7 +932,7 @@ RoleViolationMetric(role="helpful customer service agent")</code></pre>
 
     <!-- MULTI-TURN METRICS -->
     <section id="multi-turn-metrics">
-      <h2 class="part">12. Multi-Turn Metrics</h2>
+      <h2 class="part">13. Multi-Turn Metrics</h2>
       <p class="part-note">These check a whole conversation, not just one reply.</p>
 
       <h3>Chatbot conversations</h3>
@@ -1011,7 +1064,7 @@ evaluate(
 
     <!-- RUNNING EVALS -->
     <section id="running-evals">
-      <h2 class="part">13. Running evals</h2>
+      <h2 class="part">14. Running evals</h2>
       <p class="part-note">Every eval needs a test case and a metric with a threshold to decide pass/fail; a dataset groups many test cases for a bulk run.</p>
 
       <div class="note">
