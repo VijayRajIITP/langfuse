@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Direct PDF ingestion with multimodal embeddings</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#F3F4F6; --box:#FFFFFF; --ink:#1B2430; --muted:#5D6977; --line:#C5CCD5;
+  --a:#1B6A86; --a-soft:#DCEDF3; --b:#6444B4; --b-soft:#E9E2F7; --bad:#9A3B2E; --bad-soft:#F6E1DC;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#12171D; --box:#1B222B; --ink:#E6EBF0; --muted:#97A3B0; --line:#344050;
+    --a:#63BBD9; --a-soft:#17323D; --b:#B7A3F3; --b-soft:#2A2442; --bad:#E7907F; --bad-soft:#3A201B;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12171D; --box:#1B222B; --ink:#E6EBF0; --muted:#97A3B0; --line:#344050;
+  --a:#63BBD9; --a-soft:#17323D; --b:#B7A3F3; --b-soft:#2A2442; --bad:#E7907F; --bad-soft:#3A201B; color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;font-size:16px}
+.wrap{max-width:900px;margin:0 auto;padding:30px 18px 60px}
+h1{font-size:clamp(1.5rem,3.6vw,2.1rem);line-height:1.15;margin:0 0 26px;font-weight:800;letter-spacing:-.01em}
+section{margin-bottom:38px}
+h2{font-size:1.2rem;margin:0 0 10px;font-weight:700}
+p{margin:0 0 12px;max-width:68ch}
+.card{background:var(--box);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.cmp .card h3{margin:0 0 8px;font-size:.98rem}
+.cmp .old{border-left:5px solid var(--bad)}
+.cmp .new{border-left:5px solid var(--a)}
+.cmp .mini{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.82rem;font-weight:600;margin-bottom:10px}
+.cmp .mini span.b{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+.cmp .old .mini span.x{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.cmp .new .mini span.x{background:var(--a-soft);border-color:var(--a);color:var(--a)}
+.cmp .mini i{color:var(--muted);font-style:normal}
+.cmp ul{margin:0;padding-left:18px;font-size:.92rem;color:var(--muted)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.chip{font-size:.85rem;font-weight:600;padding:5px 12px;border-radius:999px;background:var(--box);border:1px solid var(--line)}
+dl{margin:0;display:grid;grid-template-columns:150px 1fr;gap:8px 14px}
+dt{color:var(--muted);font-size:.9rem;font-weight:600}
+dd{margin:0}
+a{color:var(--a);font-weight:600}
+:focus-visible{outline:3px solid var(--a);outline-offset:2px}
+
+/* block diagram */
+.drow{margin-bottom:18px}
+.dlabel{font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:8px}
+.dscroll{overflow-x:auto;padding:4px 2px 8px}
+.dflow{display:flex;align-items:center;flex-wrap:nowrap;width:max-content}
+.dbox{font:inherit;color:var(--ink);background:var(--box);border:1.5px solid var(--line);border-radius:8px;padding:8px 12px;min-width:104px;max-width:140px;text-align:center;font-size:.86rem;font-weight:600;line-height:1.25;cursor:pointer;transition:background .2s,border-color .2s}
+.dbox small{display:block;font-weight:400;color:var(--muted);font-size:.74rem;margin-top:2px}
+.darrow{width:26px;flex:0 0 26px;color:var(--muted);display:flex;justify-content:center}
+.darrow svg{width:20px;height:20px}
+.ing .dbox:hover,.ing .dbox.on{border-color:var(--a);background:var(--a-soft)}
+.qry .dbox:hover,.qry .dbox.on{border-color:var(--b);background:var(--b-soft)}
+.dnote{min-height:1.5em;font-size:.9rem;color:var(--muted);margin-top:4px}
+
+/* table */
+.scroll{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;background:var(--box);border:1px solid var(--line)}
+table.t th,table.t td{border:1px solid var(--line);padding:10px 12px;text-align:left;font-size:.92rem}
+table.t th{background:var(--bg);color:var(--muted);font-weight:600}
+table.t td{height:40px}
+.hint{color:var(--muted);font-size:.9rem;margin-top:8px}
+table.t td small{display:block;color:var(--muted);font-size:.8rem;margin-top:3px;line-height:1.35}
+.h3{font-size:1rem;margin:26px 0 10px;font-weight:700}
+.tcbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;font-size:.9rem;color:var(--muted)}
+.tcbar select{font:inherit;color:var(--ink);background:var(--box);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+table.tc{min-width:560px}
+table.tc td{padding:6px 8px;height:auto}
+table.tc input,table.tc select{width:100%;font:inherit;font-size:.92rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
+table.tc select:disabled{opacity:.6}
+.badge{display:inline-block;font-size:.82rem;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--bg);color:var(--muted)}
+.badge.t1{background:var(--a-soft);color:var(--a)}
+.badge.t3{background:var(--b-soft);color:var(--b)}
+.badge.miss{background:var(--bad-soft);color:var(--bad)}
+.xbtn{font:inherit;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:1.2rem;padding:2px 8px}
+.xbtn:hover{color:var(--ink)}
+.addbtn{font:inherit;font-weight:600;font-size:.9rem;border:1.5px solid var(--line);background:var(--box);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;margin-top:10px}
+.addbtn:hover{border-color:var(--ink)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.kpi{background:var(--box);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi b{display:block;font-size:1.6rem;font-weight:800;line-height:1.1}
+.kpi span{font-size:.82rem;color:var(--muted)}
+@media (max-width:640px){.cmp{grid-template-columns:1fr}dl{grid-template-columns:1fr;gap:2px}dd{margin-bottom:8px}}
+@media (prefers-reduced-motion:reduce){.dbox{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Direct PDF ingestion with multimodal embeddings, no OCR</h1>
+
+  <section id="idea">
+    <h2>Idea</h2>
+    <p>Today, a PDF is usually sent to OCR first, and the extracted text is embedded. OCR flattens tables into loose text and drops graphs and their axes. We want to remove the OCR step.</p>
+    <p>Instead, each PDF page is saved as a page image and sent straight to a multimodal embedding model. The model reads the page as a picture, so the table layout, the headings and the graphs stay intact in the vector. A text question is embedded by the same model and compared with the page vectors to find the right page.</p>
+    <div class="cmp">
+      <div class="card old">
+        <h3>Usual way</h3>
+        <div class="mini"><span class="b">PDF</span><i>→</i><span class="b x">OCR</span><i>→</i><span class="b">Text</span><i>→</i><span class="b">Embedding</span></div>
+        <ul><li>Table structure is lost in the text</li><li>Graphs and axes are not captured</li><li>OCR errors pass into the embedding</li></ul>
+      </div>
+      <div class="card new">
+        <h3>Our way</h3>
+        <div class="mini"><span class="b">PDF</span><i>→</i><span class="b">Page images</span><i>→</i><span class="b x">Multimodal embedding</span></div>
+        <ul><li>No OCR step</li><li>Tables and graphs are embedded as they look</li><li>One model for page images and text questions</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="pdf">
+    <h2>The PDFs</h2>
+    <p>Each PDF has headings and also contains tables and graphs with an x-axis against a y-axis, so the documents are well mixed: text, tables and charts on the same pages.</p>
+    <div class="chips"><span class="chip">Headings</span><span class="chip">Tables</span><span class="chip">Graphs (x-axis vs y-axis)</span></div>
+  </section>
+
+  <section id="dataset">
+    <h2>Dataset</h2>
+    <div class="card">
+      <dl>
+        <dt>Name</dt><dd>Scanned Document: Table Dataset</dd>
+        <dt>Source</dt><dd><a href="https://www.kaggle.com/datasets/jayasooryantm/table-extraction" target="_blank" rel="noopener">Kaggle, jayasooryantm/table-extraction</a></dd>
+        <dt>Description</dt><dd>Dataset for table extraction and detection task (tags: business, image, computer vision, English).</dd>
+        <dt>Files used</dt><dd>42 image files in data/archive/, 31 distinct (11 duplicate copies in a subfolder).</dd>
+        <dt>Scanned pages</dt><dd>20 images, mostly about 800 × 1100 px. This is the set we start with.</dd>
+        <dt>Attention pages</dt><dd>11 images at 1275 × 1650 px, used later.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section id="diagram">
+    <h2>Block diagram</h2>
+    <div class="drow ing">
+      <div class="dlabel">Ingestion</div>
+      <div class="dscroll"><div class="dflow" data-note="n1"></div></div>
+      <div class="dnote" id="n1">Click a box for details.</div>
+    </div>
+    <div class="drow qry">
+      <div class="dlabel">Query</div>
+      <div class="dscroll"><div class="dflow" data-note="n2"></div></div>
+      <div class="dnote" id="n2">Click a box for details.</div>
+    </div>
+  </section>
+
+  <section id="table">
+    <h2>Table data</h2>
+    <div class="scroll">
+      <table class="t">
+        <thead><tr><th>PDF</th><th>Images</th><th>Image dimension (W × H px)</th><th>Embedding time</th></tr></thead>
+        <tbody>
+          <tr><td>Kaggle PDF: scanned pages</td><td>20</td><td>about 800 × 1100<small>816 × 1056 (9), 793 × 1123 (7), 794 × 1123 (2), 768 × 1008 (1), 795 × 1123 (1)</small></td><td>200 – 400 s</td></tr>
+          <tr><td>Attention paper pages</td><td>11</td><td>1275 × 1650</td><td>200 – 600 s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">Embedding times were measured with MAX_SOFT_TOKENS = 1120, the highest setting.</p>
+
+    <h3 class="h3">Settings used</h3>
+    <div class="scroll">
+      <table class="t">
+        <thead><tr><th>Setting</th><th>Value</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td><b>MAX_SOFT_TOKENS</b></td><td>1120</td><td>Maximum number of tokens the model uses to represent one image. Allowed values are 70, 140, 280, 560 and 1120, so 1120 is the highest (most detail, slowest).</td></tr>
+          <tr><td><b>VECTOR_SIZE</b></td><td>768</td><td>Size of each embedding vector, which is the embedding dimension: every image is converted into 768 numbers.</td></tr>
+          <tr><td><b>BATCH_SIZE</b></td><td>2</td><td>Images embedded per batch. Each batch is upserted to Qdrant right after, so an interrupted run keeps its progress.</td></tr>
+          <tr><td><b>COLLECTION</b></td><td>scanned_pdf</td><td>Qdrant collection name.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="cost">
+    <h2>LLM cost comparison</h2>
+    <div class="scroll">
+      <table class="t tc" style="min-width:820px">
+        <thead><tr><th>Document / Image</th><th>Dimensions (px)</th><th>Model</th><th>Image detail</th><th>Image tokens</th><th>Text tokens</th><th>Text cost ($)</th><th>Image cost ($)</th></tr></thead>
+        <tbody>
+          <tr><td>Attention Is All You Need paper</td><td>1275 &times; 1650</td><td>GPT-5.5</td><td>Low</td><td>250</td><td>840</td><td>$0.00420</td><td><b>$0.00125</b></td></tr>
+          <tr><td>Attention Is All You Need paper</td><td>1275 &times; 1650</td><td>GPT-5.5</td><td>High</td><td>2,496</td><td>840</td><td>$0.00420</td><td><b>$0.01248</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">Only the LLM cost, no embedding cost. Price used: $5 per 1M tokens for both text and image tokens, taken from the OpenAI calculator.</p>
+  </section>
+
+  <section id="tests">
+    <h2>Test cases</h2>
+    <p>For each query, mark whether the correct page came back at rank 1 (Top-1) or within the first three results (Top-3),.</p>
+    <p class="hint" style="margin:0 0 12px;color:var(--ink)"><b>Timing:</b> model loading took 11.9 s and retrieval took about 1.1 s per query.</p>
+    <div class="scroll">
+      <table class="t tc">
+        <thead><tr><th style="width:56%">Query</th><th style="width:19%">Top-1 correct?</th><th style="width:19%">Top-3 correct?</th><th style="width:6%"></th></tr></thead>
+        <tbody id="tcRows"></tbody>
+      </table>
+    </div>
+    <button class="addbtn" id="tcAdd" type="button">Add query</button>
+    <div class="kpis">
+      <div class="kpi"><b id="kT1">—</b><span>Correct in Top-1</span></div>
+      <div class="kpi"><b id="kT3">—</b><span>Correct in Top-3</span></div>
+      <div class="kpi"><b id="kDone">0</b><span>Queries tested</span></div>
+    </div>
+    <p class="hint">If Top-1 is correct, Top-3 is counted as correct too. If Top-1 is wrong, check whether the correct page appears in the first three.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  var rowsEl=document.getElementById("tcRows");
+  var KEY="tc-v7",S={unit:"ms",rows:[]};
+  function blank(){return {q:"",t1:"",t3:"",time:"",note:""}}
+  function mk(q,t1,t3,note){return {q:q,t1:t1,t3:t3,time:"",note:note||""}}
+  try{var sv=JSON.parse(localStorage.getItem(KEY)||"null");if(sv&&sv.rows&&sv.rows.length)S=sv}catch(e){}
+  if(!S.rows.length)S.rows=[
+    mk("What is the cost J3 for the RM scheduling policy?","yes","yes"),
+    mk("What is the cost J3 for the EDF scheduling policy?","","","Result not given yet"),
+    mk("How is the performance of each pendulum obtained?","yes","yes"),
+    mk("How does the accumulated cost change over time?","yes","yes"),
+    mk("What was the urban male activity rate in 1995?","yes","yes"),
+    mk("What was the rural female activity rate in 1992?","yes","yes","Correct page, but the LLM was not able to answer"),
+    mk("Compare the urban and rural female activity rates in 1995.","","","Result not given yet"),
+    mk("What was the difference between the urban and rural male employment rates in 1990?","yes","yes","Correct in both"),
+    mk("In 1995, which had a higher total employment rate: urban or rural areas?","yes","yes","Correct page, but no answer from the LLM"),
+    mk("What was the urban male labor force participation rate in LFSS 1995?","yes","yes"),
+    mk("What is minDetectionWindow?","no","yes","Found at rank 2. LLM gave no answer"),
+    mk("What is min error Threshold?","yes","yes"),
+    mk("What is minErrorThreshold?","yes","yes"),
+    mk("What is maxErrorThreshold?","yes","yes"),
+    mk("What was the forgetting factor used in the experiments?","no","yes","Found at rank 3"),
+    mk("Given that windowSize is 7, what is the value of minDetectionWindow?","","","LLM not able to answer. Page rank not given yet"),
+    mk("Who is the author of the self attention paper?","yes","yes"),
+    mk("What BLEU score did the Transformer (big) model achieve on the English-to-German (EN-DE) translation task?","yes","yes","Correctly identified"),
+    mk("What BLEU score did the Transformer (big) model achieve on the English-to-French (EN-FR) translation task?","yes","yes"),
+    mk("What was the training cost of the Transformer (base model) for EN-DE?","no","yes","Found at rank 2"),
+    mk("What was the training cost of the Transformer (big) model for EN-DE?","yes","yes"),
+    mk("What BLEU score did ConvS2S achieve on EN-FR?","yes","yes"),
+    mk("Which model achieved the highest EN-DE BLEU score?","yes","yes"),
+    mk("What BLEU score did the base Transformer model achieve on the development set?","no","yes","Found at rank 2"),
+    mk("What were the BLEU score and parameter count for the variation with Dmodel=1024 in group (C)?","","","Result not given yet"),
+    mk("Where is the code used to train and evaluate the Transformer models available?","yes","yes")
+  ];
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+  function complete(r){return r.t1==="yes"||(r.t1==="no"&&r.t3!=="")}
+  function badge(r){
+    if(!complete(r))return ['—',''];
+    if(r.t1==="yes")return ['Top-1','t1'];
+    if(r.t3==="yes")return ['Top-3','t3'];
+    return ['Missed','miss'];
+  }
+  function pct(a,b){return b?Math.round(a/b*100)+'%':'—'}
+  function summary(){
+    var done=S.rows.filter(complete),t1=done.filter(function(r){return r.t1==="yes"}).length;
+    var t3=done.filter(function(r){return r.t1==="yes"||r.t3==="yes"}).length;
+    document.getElementById("kT1").textContent=pct(t1,done.length);
+    document.getElementById("kT3").textContent=pct(t3,done.length);
+    document.getElementById("kDone").textContent=done.length+' of '+S.rows.length;
+    save();
+  }
+  function opts(v){return '<option value=""'+(v===''?' selected':'')+'>Select</option><option value="yes"'+(v==='yes'?' selected':'')+'>Yes</option><option value="no"'+(v==='no'?' selected':'')+'>No</option>'}
+  function render(){
+    rowsEl.innerHTML="";
+    S.rows.forEach(function(r,i){
+      var tr=document.createElement("tr");
+      tr.innerHTML='<td><input class="q" type="text" placeholder="Type the query" aria-label="Query"></td>'+
+        '<td><select class="s1" aria-label="Top-1 correct">'+opts(r.t1)+'</select></td>'+
+        '<td><select class="s3" aria-label="Top-3 correct">'+opts(r.t3)+'</select></td>'+
+        '<td><button class="xbtn" type="button" aria-label="Remove query">×</button></td>';
+      var q=tr.querySelector(".q"),s1=tr.querySelector(".s1"),s3=tr.querySelector(".s3");
+      q.value=r.q;
+      function paint(){
+        if(r.t1==="yes"){r.t3="yes";s3.value="yes";s3.disabled=true}else{s3.disabled=false}
+      }
+      q.addEventListener("input",function(){r.q=q.value;save()});
+      s1.addEventListener("change",function(){r.t1=s1.value;paint();summary()});
+      s3.addEventListener("change",function(){r.t3=s3.value;paint();summary()});
+      tr.querySelector(".xbtn").addEventListener("click",function(){S.rows.splice(i,1);if(!S.rows.length)S.rows.push(blank());render();summary()});
+      paint();rowsEl.appendChild(tr);
+    });
+    summary();
+  }
+  document.getElementById("tcAdd").addEventListener("click",function(){S.rows.push(blank());render()});
+  render();
+})();
+</script>
+<script>
+(function(){
+  var ar='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  var rows=[
+    [["Input PDF","","Mixed PDF with headings, tables and graphs."],
+     ["Scanned images","20 pages","Each PDF page is saved as an image. No OCR is run."],
+     ["Embedding model","Gemma 2.0","Converts each page image into a vector."],
+     ["Qdrant","vector database","Stores the vectors with the page file names."]],
+    [["Query text","","The question you type."],
+     ["Embedding model","Gemma 2.0","Converts the question into a vector in the same space."],
+     ["Similarity search","cosine","Compares the question vector with every page vector."],
+     ["Retrieved page","top-k","The best matching pages, used to check the answer in the table."]]
+  ];
+  document.querySelectorAll(".dflow").forEach(function(flow,r){
+    var note=document.getElementById(flow.dataset.note);
+    rows[r].forEach(function(b,i){
+      var btn=document.createElement("button");
+      btn.type="button";btn.className="dbox";
+      btn.innerHTML=b[0]+(b[1]?"<small>"+b[1]+"</small>":"");
+      btn.addEventListener("click",function(){
+        flow.querySelectorAll(".dbox").forEach(function(x){x.classList.remove("on")});
+        btn.classList.add("on");note.textContent=b[2];
+      });
+      flow.appendChild(btn);
+      if(i<rows[r].length-1){var a=document.createElement("div");a.className="darrow";a.innerHTML=ar;flow.appendChild(a)}
+    });
+  });
+})();
+</script>
+</body>
+</html>
