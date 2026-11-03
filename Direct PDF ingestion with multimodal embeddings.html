@@ -181,15 +181,15 @@ table.tc select:disabled{opacity:.6}
   <section id="cost">
     <h2>LLM cost comparison</h2>
     <div class="scroll">
-      <table class="t tc" style="min-width:820px">
-        <thead><tr><th>Document / Image</th><th>Dimensions (px)</th><th>Model</th><th>Image detail</th><th>Image tokens</th><th>Text tokens</th><th>Text cost ($)</th><th>Image cost ($)</th></tr></thead>
+      <table class="t tc" style="min-width:640px">
+        <thead><tr><th>Document / Image</th><th>Dimensions (px)</th><th>Model</th><th>Image detail</th><th>Image tokens</th><th>Text tokens</th></tr></thead>
         <tbody>
-          <tr><td>Attention Is All You Need paper</td><td>1275 &times; 1650</td><td>GPT-5.5</td><td>Low</td><td>250</td><td>840</td><td>$0.00420</td><td><b>$0.00125</b></td></tr>
-          <tr><td>Attention Is All You Need paper</td><td>1275 &times; 1650</td><td>GPT-5.5</td><td>High</td><td>2,496</td><td>840</td><td>$0.00420</td><td><b>$0.01248</b></td></tr>
+          <tr><td>Attention Is All You Need paper</td><td>1275 &times; 1650</td><td>GPT-5.5</td><td>Low</td><td>250</td><td>840</td></tr>
+          <tr><td>Attention Is All You Need paper</td><td>1275 &times; 1650</td><td>GPT-5.5</td><td>High</td><td>2,496</td><td>840</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="hint">Only the LLM cost, no embedding cost. Price used: $5 per 1M tokens for both text and image tokens, taken from the OpenAI calculator.</p>
+    <p class="hint">Token counts from the <a href="https://developers.openai.com/api/docs/guides/image-cost-calculator" target="_blank" rel="noopener">OpenAI image input cost calculator</a>, GPT-5.5.</p>
   </section>
 
   <section id="tests">
